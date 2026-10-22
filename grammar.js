@@ -64,6 +64,7 @@ export default grammar({
     $.continue_term,
     $.debug_term,
     $.no_op_term,
+    $.timer_term,
   ],
 
   rules: {
@@ -1269,6 +1270,72 @@ export default grammar({
         { predicate: $.term_arg },
         { case_term_list: $.case_term_list },
       ),
+
+    thermal_zone_term: ($) =>
+      makeTerm(
+        $.thermal_zone,
+        { thermal_zone_name: $.name_string },
+        { term_list: $.term_list },
+      ),
+
+    timer_term: ($) => $.timer,
+
+    to_bcd_term: ($) =>
+      makeTerm($.to_bcd, { value: $.term_arg, result: $.target }),
+
+    to_buffer_term: ($) =>
+      makeTerm($.to_buffer, { data: $.term_arg, result: $.target }),
+
+    to_decimal_string_term: ($) =>
+      makeTerm($.to_decimal_string, { data: $.term_arg, result: $.target }),
+
+    to_hex_string_term: ($) =>
+      makeTerm($.to_hex_string, { data: $.term_arg, result: $.target }),
+
+    to_integer_term: ($) =>
+      makeTerm($.to_integer, { data: $.term_arg, result: $.target }),
+
+    to_pld_term: ($) =>
+      makeTerm($.to_pld, { pld_keyword_list: optional($.pld_keyword_list) }),
+
+    to_string_term: ($) =>
+      makeTerm($.to_string, {
+        source: $.term_arg,
+        length: optional($.term_arg),
+        result: $.target,
+      }),
+
+    to_uuid_term: ($) => makeTerm($.to_uuid, { string: $.string_data }),
+
+    unicode_term: ($) => makeTerm($.unicode, { string: $.string_data }),
+
+    unload_term: ($) => makeTerm($.unload, { ddb_handle: $.super_name }),
+
+    wait_term: ($) =>
+      makeTerm($.wait, {
+        sync_object: $.super_name,
+        timeout_value: $.term_arg,
+      }),
+
+    while_term: ($) =>
+      makeTerm($.while, { predicate: $.term_arg }, { term_list: $.term_list }),
+
+    xor_compound_term: ($) =>
+      seq(
+        field("source1_result", $.term_arg),
+        "^=",
+        field("source2", $.term_arg),
+      ),
+
+    xor_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "^", field("source2", $.term_arg)),
+
+    xor_term: ($) =>
+      makeTerm($.xor, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
