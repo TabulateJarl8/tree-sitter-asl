@@ -1054,7 +1054,221 @@ export default grammar({
         result: $.target,
       }),
 
-    //TODO: O terms
+    object_type_term: ($) =>
+      makeTerm($.object_type, {
+        object: choice(
+          $.name_string,
+          $.arg_term,
+          $.local_term,
+          $.debug_term,
+          $.ref_of_term,
+          $.deref_of_term,
+          $.index_term,
+        ),
+      }),
+
+    offset_term: ($) => makeTerm($.offset, { byte_offset: $.integer_data }),
+
+    op_region_term: ($) =>
+      makeTerm($.operation_region, {
+        region_name: $.name_string,
+        region_space: $.region_space_keyword,
+        offset: $.term_arg,
+        length: $.term_arg,
+      }),
+
+    or_compound_term: ($) =>
+      seq(
+        field("source1_result", $.term_arg),
+        "|=",
+        field("source2", $.term_arg),
+      ),
+
+    or_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "|", field("source2", $.term_arg)),
+
+    or_term: ($) =>
+      makeTerm($.or, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
+
+    package_term: ($) =>
+      makeTerm(
+        $.package,
+        { num_elements: optional(choice($.byte_const_expr, $.term_arg)) },
+        { package_list: $.package_list },
+      ),
+
+    pld_keyword: (_) =>
+      choice(
+        "PLD_Revision",
+        "PLD_IgnoreColor",
+        "PLD_Red",
+        "PLD_Green",
+        "PLD_Blue",
+        "PLD_Width",
+        "PLD_Height",
+        "PLD_UserVisible",
+        "PLD_Dock",
+        "PLD_Lid",
+        "PLD_Panel",
+        "PLD_VerticalPosition",
+        "PLD_HorizontalPosition",
+        "PLD_Shape",
+        "PLD_GroupOrientation",
+        "PLD_GroupToken",
+        "PLD_GroupPosition",
+        "PLD_Bay",
+        "PLD_Ejectable",
+        "PLD_EjectRequired",
+        "PLD_CabinetNumber",
+      ),
+
+    // WARN: this is terribly broken in the spec so this is my best guess of what they meant.
+    // pld_keyword_assign isn't actually real, but it makes the AST a bit more readable
+    pld_keyword_assign: ($) =>
+      seq(
+        field("keyword", $.pld_keyword),
+        "=",
+        field("value", choice($.string_data, $.integer_data)),
+      ),
+    pld_keyword_list: ($) =>
+      seq($.pld_keyword_assign, repeat(seq(",", $.pld_keyword_assign))),
+
+    power_res_term: ($) =>
+      makeTerm(
+        $.power_resource,
+        {
+          resource_name: $.name_string,
+          system_level: $.byte_const_expr,
+          resource_order: $.word_const_expr,
+        },
+        { term_list: $.term_list },
+      ),
+
+    printf_arg_list: ($) => seq($.term_arg, repeat(seq(",", $.term_arg))),
+
+    printf_term: ($) =>
+      makeTerm($.printf, {
+        string: $.string,
+        printf_arg_list: $.printf_arg_list,
+      }),
+
+    processor_term: ($) =>
+      makeTerm(
+        $.processor,
+        {
+          processor_name: $.name_string,
+          processor_id: $.byte_const_expr,
+          pblock_address: optional($.dword_const_expr),
+          pblock_length: optional($.byte_const_expr),
+        },
+        { term_list: $.term_list },
+      ),
+
+    raw_data_buffer_term: ($) =>
+      makeTerm(
+        $.raw_data_buffer,
+        { buff_size: optional($.word_const) },
+        { byte_list: $.byte_list },
+      ),
+
+    ref_of_term: ($) =>
+      makeTerm($.ref_of, {
+        source: choice(
+          $.name_string,
+          $.arg_term,
+          $.local_term,
+          $.deref_of_term,
+        ),
+      }),
+
+    release_term: ($) => makeTerm($.release, { sync_object: $.super_name }),
+
+    reset_term: ($) => makeTerm($.reset, { sync_object: $.super_name }),
+
+    return_term: ($) => makeTerm($.return, { arg: optional($.term_arg) }),
+
+    scope_term: ($) =>
+      makeTerm(
+        $.scope,
+        { location: $.name_string },
+        { term_list: $.term_list },
+      ),
+
+    shift_left_compound_term: ($) =>
+      seq(
+        field("source_result", $.term_arg),
+        "<<=",
+        field("shift_count", $.term_arg),
+      ),
+
+    shift_left_symbolic_term: ($) =>
+      seq(field("source", $.term_arg), "<<", field("shift_count", $.term_arg)),
+
+    shift_left_term: ($) =>
+      makeTerm($.shift_left, {
+        source: $.term_arg,
+        shift_count: $.term_arg,
+        result: $.target,
+      }),
+
+    shift_right_compound_term: ($) =>
+      seq(
+        field("source_result", $.term_arg),
+        ">>=",
+        field("shift_count", $.term_arg),
+      ),
+
+    shift_right_symbolic_term: ($) =>
+      seq(field("source", $.term_arg), ">>", field("shift_count", $.term_arg)),
+
+    shift_right_term: ($) =>
+      makeTerm($.shift_right, {
+        source: $.term_arg,
+        shift_count: $.term_arg,
+        result: $.target,
+      }),
+
+    signal_term: ($) => makeTerm($.signal, { sync_object: $.super_name }),
+
+    size_of_term: ($) => makeTerm($.size_of, { data_object: $.super_name }),
+
+    sleep_term: ($) => makeTerm($.sleep, { milliseconds: $.term_arg }),
+
+    stall_term: ($) => makeTerm($.stall, { microseconds: $.term_arg }),
+
+    store_symbolic_term: ($) =>
+      seq(field("destination", $.super_name), "=", field("source", $.term_arg)),
+
+    store_term: ($) =>
+      makeTerm($.store, { source: $.term_arg, destination: $.super_name }),
+
+    subtract_compound_term: ($) =>
+      seq(
+        field("minuend_result", $.term_arg),
+        "-=",
+        field("subtrahend", $.term_arg),
+      ),
+
+    subtract_symbolic_term: ($) =>
+      seq(field("minuend", $.term_arg), "-", field("subtrahend", $.term_arg)),
+
+    subtract_term: ($) =>
+      makeTerm($.subtract, {
+        minuend: $.term_arg,
+        subtrahend: $.term_arg,
+        result: $.target,
+      }),
+
+    switch_term: ($) =>
+      makeTerm(
+        $.switch,
+        { predicate: $.term_arg },
+        { case_term_list: $.case_term_list },
+      ),
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
