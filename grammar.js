@@ -135,7 +135,12 @@ export default grammar({
     dword_list: ($) => commaSep($.dword_const_expr),
 
     extended_access_attrib_term: ($) =>
-      seq($.extended_access_attrib_keyword, "(", $.access_length, ")"),
+      seq(
+        $.extended_access_attrib_keyword,
+        "(",
+        field("access_length", $.byte_const),
+        ")",
+      ),
 
     field_unit_list: ($) => commaSep($.field_unit),
     field_unit: ($) =>
@@ -169,7 +174,8 @@ export default grammar({
         $.object,
         $.statement_opcode,
         $.expression_opcode,
-        $.symbolic_expression,
+        // WARN: the spec says "SymbolicExpression" here and im guessing they mean the term
+        $.symbolic_expression_term,
       ),
     object: ($) =>
       choice($.compiler_directive, $.named_object, $.name_space_modifier),
