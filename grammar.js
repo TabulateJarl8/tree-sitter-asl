@@ -72,11 +72,10 @@ export default grammar({
     // 19.2.2 ASL Name and Pathname Terms
     _lead_name_char: (_) => /[A-Za-z_]/,
     _digit_char: (_) => /[0-9]/,
-    _name_char: ($) => choice($.digit_char, $.lead_name_char),
+    _name_char: ($) => choice($._digit_char, $._lead_name_char),
     _root_char: (_) => "\\",
     _parent_prefix_char: (_) => "^",
     _path_separator_char: (_) => ".",
-    _comma_char: (_) => ",",
     _semicolon_delimiter: (_) => optional(";"),
     name_seg: ($) =>
       seq(
@@ -124,7 +123,8 @@ export default grammar({
         $.arg_term,
         $.local_term,
         $.name_string,
-        $.symbolic_expression,
+        // WARN: the spec says "SymbolicExpression" but thats never defined so im assuming its this
+        $.symbolic_expression_term,
       ),
     method_invocation_term: ($) => seq($.name_string, "(", $.arg_list, ")"),
 
@@ -144,8 +144,7 @@ export default grammar({
         $.access_as_term,
         $.connection_term,
       ),
-    field_unit_entry: ($) =>
-      seq(optional($.name_seg), $._comma_char, $.integer),
+    field_unit_entry: ($) => seq(optional($.name_seg), ",", $.integer),
 
     package_list: ($) => commaSep($.package_element),
     package_element: ($) => choice($.data_object, $.name_string),
@@ -504,9 +503,7 @@ export default grammar({
         $.access_as,
         "(",
         field("access_type", $.access_type_keyword),
-        optional(
-          seq($._comma_char, field("access_attribute", $._access_attribute)),
-        ),
+        optional(seq(",", field("access_attribute", $._access_attribute))),
         ")",
       ),
 
@@ -1336,6 +1333,8 @@ export default grammar({
         source2: $.term_arg,
         result: $.target,
       }),
+
+    // 19.2.7 ASL Parameter Keyword Terms
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
