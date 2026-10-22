@@ -18,35 +18,28 @@ function commaSep(rule) {
   return optional(commaSep1(rule));
 }
 
-function makeTerm(keyword, args = [], block = null) {
-  const doField = (arg) => {
-    if (Array.isArray(arg) && arg.length === 2 && typeof arg[0] === "string") {
-      return field(arg[0], arg[1]);
-    }
-    return arg;
-  };
-
+function makeTerm(keyword, args = {}, block = null) {
   const commas = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    const isOptional = Array.isArray(arg) && arg[2] === true;
-    const fielded = doField(arg);
+  const entries = Object.entries(args);
+
+  for (let i = 0; i < entries.length; i++) {
+    const [key, rule] = entries[i];
+    const fielded = field(key, rule);
 
     if (i === 0) {
-      commas.push(isOptional ? optional(fielded) : fielded);
+      commas.push(fielded);
     } else {
-      if (isOptional) {
-        commas.push(optional(seq(",", fielded)));
-      } else {
-        commas.push(",", fielded);
-      }
+      commas.push(",", fielded);
     }
   }
 
   const parens = seq(keyword, "(", ...commas, ")");
   if (!block) return parens;
 
-  return seq(parens, "{", ...block.map(doField), "}");
+  const blockFields = Object.entries(block).map(([key, rule]) =>
+    field(key, rule),
+  );
+  return seq(parens, "{", ...blockFields, "}");
 }
 
 /// <reference types="tree-sitter-cli/dsl" />
@@ -517,10 +510,10 @@ export default grammar({
       ),
 
     acquire_term: ($) =>
-      makeTerm($.acquire, [
-        ["sync_object", $.super_name],
-        ["timeout_value", $.word_const_expr],
-      ]),
+      makeTerm($.acquire, {
+        sync_object: $.super_name,
+        timeout_value: $.word_const_expr,
+      }),
 
     add_compound_term: ($) =>
       seq(
@@ -533,17 +526,17 @@ export default grammar({
       seq(field("addend1", $.term_arg), "+", field("addend2", $.term_arg)),
 
     add_term: ($) =>
-      makeTerm($.add, [
-        ["addend1", $.term_arg],
-        ["addend2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.add, {
+        addend1: $.term_arg,
+        addend2: $.term_arg,
+        result: $.target,
+      }),
 
     alias_term: ($) =>
-      makeTerm($.alias, [
-        ["source_object", $.name_string],
-        ["alias_object", $.name_string],
-      ]),
+      makeTerm($.alias, {
+        source_object: $.name_string,
+        alias_object: $.name_string,
+      }),
 
     and_compound_term: ($) =>
       seq(
@@ -556,26 +549,26 @@ export default grammar({
       seq(field("source1", $.term_arg), "&", field("source2", $.term_arg)),
 
     and_term: ($) =>
-      makeTerm($.and, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.and, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     arg_term: (_) => /Arg[0-6]/i,
 
     bank_field_term: ($) =>
       makeTerm(
         $.bank_field,
-        [
-          ["region_name", $.name_string],
-          ["bank_name", $.name_string],
-          ["bank_value", $.term_arg],
-          ["access_type", $.access_type_keyword],
-          ["lock_rule", $.lock_rule_keyword],
-          ["update_rule", $.update_rule_keyword],
-        ],
-        [["field_unit_list", $.field_unit_list]],
+        {
+          region_name: $.name_string,
+          bank_name: $.name_string,
+          bank_value: $.term_arg,
+          access_type: $.access_type_keyword,
+          lock_rule: $.lock_rule_keyword,
+          update_rule: $.update_rule_keyword,
+        },
+        { field_unit_list: $.field_unit_list },
       ),
 
     break_point_term: ($) => $.break_point,
@@ -584,112 +577,113 @@ export default grammar({
     buffer_term: ($) =>
       makeTerm(
         $.buffer,
-        [["buff_size", optional($.term_arg)]],
-        [[choice($.string_data, $.byte_list)]],
+        { buff_size: optional($.term_arg) },
+        { block: choice($.string_data, $.byte_list) },
       ),
 
     case_term: ($) =>
-      makeTerm(
-        $.case,
-        [["value", $.data_object]],
-        [["term_list", $.term_list]],
-      ),
+      makeTerm($.case, { value: $.data_object, term_list: $.term_list }),
 
     concat_res_term: ($) =>
-      makeTerm($.concatenate_res_template, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.concatenate_res_template, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     concat_term: ($) =>
-      makeTerm($.concatenate, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.concatenate, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     connection_term: ($) =>
-      makeTerm($.connection, [
-        ["connection_resource", choice($.name_string, $.resource_macro_term)],
-      ]),
+      makeTerm($.connection, {
+        connection_resource: choice($.name_string, $.resource_macro_term),
+      }),
 
     cond_ref_of_term: ($) =>
-      makeTerm($.cond_ref_of, [
-        [
-          "source",
-          choice($.name_string, $.arg_term, $.local_term, $.deref_of_term),
-        ],
-        ["destination", $.target],
-      ]),
+      makeTerm(
+        $.cond_ref_of,
+        {
+          source: choice(
+            $.name_string,
+            $.arg_term,
+            $.local_term,
+            $.deref_of_term,
+          ),
+        },
+        { destination: $.target },
+      ),
 
     continue_term: ($) => $.continue,
 
     copy_object_term: ($) =>
-      makeTerm($.copy_object, [
-        ["source", $.term_arg],
-        ["result", choice($.name_string, $.local_term, $.arg_term)],
-      ]),
+      makeTerm($.copy_object, {
+        source: $.term_arg,
+        result: choice($.name_string, $.local_term, $.arg_term),
+      }),
 
     create_bit_field_term: ($) =>
-      makeTerm($.create_bit_field, [
-        ["source_buffer", $.term_arg],
-        ["bit_index", $.term_arg],
-        ["bit_field_name", $.name_string],
-      ]),
+      makeTerm($.create_bit_field, {
+        source_buffer: $.term_arg,
+        bit_index: $.term_arg,
+        bit_field_name: $.name_string,
+      }),
     create_byte_field_term: ($) =>
-      makeTerm($.create_byte_field, [
-        ["source_buffer", $.term_arg],
-        ["byte_index", $.term_arg],
-        ["byte_field_name", $.name_string],
-      ]),
+      makeTerm($.create_byte_field, {
+        source_buffer: $.term_arg,
+        byte_index: $.term_arg,
+        byte_field_name: $.name_string,
+      }),
     create_dword_field_term: ($) =>
-      makeTerm($.create_dword_field, [
-        ["source_buffer", $.term_arg],
-        ["byte_index", $.term_arg],
-        ["dword_field_name", $.name_string],
-      ]),
+      makeTerm($.create_dword_field, {
+        source_buffer: $.term_arg,
+        byte_index: $.term_arg,
+        dword_field_name: $.name_string,
+      }),
     create_qword_field_term: ($) =>
-      makeTerm($.create_qword_field, [
-        ["source_buffer", $.term_arg],
-        ["byte_index", $.term_arg],
-        ["qword_field_name", $.name_string],
-      ]),
+      makeTerm($.create_qword_field, {
+        source_buffer: $.term_arg,
+        byte_index: $.term_arg,
+        qword_field_name: $.name_string,
+      }),
     create_word_field_term: ($) =>
-      makeTerm($.create_word_field, [
-        ["source_buffer", $.term_arg],
-        ["byte_index", $.term_arg],
-        ["word_field_name", $.name_string],
-      ]),
+      makeTerm($.create_word_field, {
+        source_buffer: $.term_arg,
+        byte_index: $.term_arg,
+        word_field_name: $.name_string,
+      }),
 
     data_region_term: ($) =>
-      makeTerm($.data_table_region, [
-        ["region_name", $.name_string],
-        ["signature_string", $.term_arg],
-        ["oem_id_string", $.term_arg],
-        ["oem_table_id_string", $.term_arg],
-      ]),
+      makeTerm($.data_table_region, {
+        region_name: $.name_string,
+        signature_string: $.term_arg,
+        oem_id_string: $.term_arg,
+        oem_table_id_string: $.term_arg,
+      }),
 
     debug_term: ($) => $.debug,
 
     dec_symbolic_term: ($) => seq(field("minuend", $.super_name), "--"),
 
-    dec_term: ($) => makeTerm($.decrement, [["minuend", $.super_name]]),
+    dec_term: ($) => makeTerm($.decrement, { minuend: $.super_name }),
 
     default_term: ($) => seq($.default, "{", $.term_list, "}"),
 
     definition_block_term: ($) =>
       makeTerm(
         $.definition_block,
-        [
-          ["aml_file_name", $.string],
-          ["table_signature", $.string],
-          ["compliance_revision", $.byte_const],
-          ["oem_id", $.string],
-          ["table_id", $.string],
-          ["oem_revision", $.dword_const],
-        ],
-        [[$.term_list]],
+        {
+          aml_file_name: $.string,
+          table_signature: $.string,
+          compliance_revision: $.byte_const,
+          oem_id: $.string,
+          table_id: $.string,
+          oem_revision: $.dword_const,
+        },
+        { term_list: $.term_list },
       ),
 
     _deref_of_source: ($) =>
@@ -702,14 +696,13 @@ export default grammar({
         $.index_term,
         $.method_invocation_term,
       ),
-    deref_of_term: ($) =>
-      makeTerm($.deref_of, [["source", $._deref_of_source]]),
+    deref_of_term: ($) => makeTerm($.deref_of, { source: $._deref_of_source }),
 
     device_term: ($) =>
       makeTerm(
         $.device,
-        [["device_name", $.name_string]],
-        [["term_list", $.term_list]],
+        { device_name: $.name_string },
+        { term_list: $.term_list },
       ),
 
     divide_compound_term: ($) =>
@@ -723,15 +716,14 @@ export default grammar({
       seq(field("dividend", $.term_arg), "/", field("divisor", $.term_arg)),
 
     divide_term: ($) =>
-      makeTerm($.divide, [
-        ["dividend", $.term_arg],
-        ["divisor", $.term_arg],
-        ["remainder", $.target],
-        ["result", $.target],
-      ]),
+      makeTerm($.divide, {
+        dividend: $.term_arg,
+        divisor: $.term_arg,
+        remainder: $.target,
+        result: $.target,
+      }),
 
-    eisa_id_term: ($) =>
-      makeTerm($.eisa_id, [["eisa_id_string", $.string_data]]),
+    eisa_id_term: ($) => makeTerm($.eisa_id, { eisa_id_string: $.string_data }),
 
     _else_else_if: ($) => choice($.else_term, $.else_if_term),
 
@@ -739,8 +731,8 @@ export default grammar({
       seq(
         makeTerm(
           $.else_if,
-          [["predicate", $.term_arg]],
-          [["term_list", $.term_list]],
+          { predicate: $.term_arg },
+          { term_list: $.term_list },
         ),
         optional($._else_else_if),
       ),
@@ -749,239 +741,238 @@ export default grammar({
     // NOTE: optionality should be handled in the parent rule
     else_term: ($) => seq($.else, "{", field("term_list", $.term_list), "}"),
 
-    event_term: ($) => makeTerm($.event, [["event_name", $.name_string]]),
+    event_term: ($) => makeTerm($.event, { event_name: $.name_string }),
 
     external_term: ($) =>
-      makeTerm($.external, [
-        ["obj_name", $.name_string],
-        ["obj_type", $.object_type_keyword, true],
-        ["result_type", $.parameter_type_package, true],
-        ["parameter_types", $.parameter_types_package, true],
-      ]),
+      makeTerm($.external, {
+        obj_name: $.name_string,
+        obj_type: optional($.object_type_keyword),
+        result_type: optional($.parameter_type_package),
+        parameter_types: optional($.parameter_types_package),
+      }),
 
     fatal_term: ($) =>
-      makeTerm($.fatal, [
-        ["type", $.byte_const_expr],
-        ["code", $.dword_const_expr],
-        ["arg", $.term_arg],
-      ]),
+      makeTerm($.fatal, {
+        type: $.byte_const_expr,
+        code: $.dword_const_expr,
+        arg: $.term_arg,
+      }),
 
     field_term: ($) =>
       makeTerm(
         $.field,
-        [
-          ["region_name", $.name_string],
-          ["access_type", $.access_type_keyword],
-          ["lock_rule", $.lock_rule_keyword],
-          ["update_rule", $.update_rule_keyword],
-        ],
-        [["field_unit_list", $.field_unit_list]],
+        {
+          region_name: $.name_string,
+          access_type: $.access_type_keyword,
+          lock_rule: $.lock_rule_keyword,
+          update_rule: $.update_rule_keyword,
+        },
+        { field_unit_list: $.field_unit_list },
       ),
 
     find_set_left_bit_term: ($) =>
-      makeTerm($.find_set_left_bit, [
-        ["source", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.find_set_left_bit, {
+        source: $.term_arg,
+        result: $.target,
+      }),
     find_set_right_bit_term: ($) =>
-      makeTerm($.find_set_right_bit, [
-        ["source", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.find_set_right_bit, {
+        source: $.term_arg,
+        result: $.target,
+      }),
 
     for_term: ($) =>
       makeTerm(
         $.for,
-        [
-          ["initialize", $.term_arg, true],
-          ["predicate", $.term_arg, true],
-          ["update", $.term_arg, true],
-        ],
-        [["term_list", $.term_list]],
+        {
+          initialize: optional($.term_arg),
+          predicate: optional($.term_arg),
+          update: optional($.term_arg),
+        },
+        { term_list: $.term_list },
       ),
 
     fprintf_term: ($) =>
-      makeTerm($.fprintf, [
-        ["term_arg", $.term_arg],
-        ["string", $.string],
-        ["printf_arg_list", $.printf_arg_list],
-      ]),
+      makeTerm($.fprintf, {
+        term_arg: $.term_arg,
+        string: $.string,
+        printf_arg_list: $.printf_arg_list,
+      }),
 
     from_bcd_term: ($) =>
-      makeTerm($.from_bcd, [
-        ["bcd_value", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.from_bcd, {
+        bcd_value: $.term_arg,
+        result: $.target,
+      }),
 
     function_term: ($) =>
       makeTerm(
         $.function,
-        [
-          ["function_name", $.name_string],
-          ["return_type", $.parameter_type_package, true],
-          ["parameter_types", $.parameter_types_package, true],
-        ],
-        [["term_list", $.term_list]],
+        {
+          function_name: $.name_string,
+          return_type: optional($.parameter_type_package),
+          parameter_types: optional($.parameter_types_package),
+        },
+        { term_list: $.term_list },
       ),
 
     if_term: ($) =>
-      makeTerm($.if, [["predicate", $.term_arg]], [["term_list", $.term_list]]),
+      makeTerm($.if, { predicate: $.term_arg }, { term_list: $.term_list }),
 
-    include_term: ($) =>
-      makeTerm($.include, [["file_path_name", $.string_data]]),
+    include_term: ($) => makeTerm($.include, { file_path_name: $.string_data }),
 
     inc_symbolic_term: ($) => seq(field("addend", $.super_name), "++"),
 
-    inc_term: ($) => makeTerm($.increment, [["addend", $.super_name]]),
+    inc_term: ($) => makeTerm($.increment, { addend: $.super_name }),
 
     index_field_term: ($) =>
       makeTerm(
         $.index_field,
-        [
-          ["index_name", $.name_string],
-          ["data_name", $.name_string],
-          ["access_type", $.access_type_keyword],
-          ["lock_rule", $.lock_rule_keyword],
-          ["update_rule", $.update_rule_keyword],
-        ],
-        [["field_unit_list", $.field_unit_list]],
+        {
+          index_name: $.name_string,
+          data_name: $.name_string,
+          access_type: $.access_type_keyword,
+          lock_rule: $.lock_rule_keyword,
+          update_rule: $.update_rule_keyword,
+        },
+        { field_unit_list: $.field_unit_list },
       ),
 
     index_symbolic_term: ($) =>
       seq(field("source", $.term_arg), "[", field("index", $.term_arg), "]"),
 
     index_term: ($) =>
-      makeTerm($.index, [
-        ["source", $.term_arg],
-        ["index", $.term_arg],
-        ["destination", $.target],
-      ]),
+      makeTerm($.index, {
+        source: $.term_arg,
+        index: $.term_arg,
+        destination: $.target,
+      }),
 
     l_and_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "&&", field("source2", $.term_arg)),
 
     l_and_term: ($) =>
-      makeTerm($.l_and, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_and, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_equal_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "==", field("source2", $.term_arg)),
 
     l_equal_term: ($) =>
-      makeTerm($.l_equal, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_equal, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_greater_equal_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), ">=", field("source2", $.term_arg)),
 
     l_greater_equal_term: ($) =>
-      makeTerm($.l_greater_equal, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_greater_equal, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_greater_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), ">", field("source2", $.term_arg)),
 
     l_greater_term: ($) =>
-      makeTerm($.l_greater, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_greater, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_less_equal_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "<=", field("source2", $.term_arg)),
 
     l_less_equal_term: ($) =>
-      makeTerm($.l_less_equal, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_less_equal, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_less_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "<", field("source2", $.term_arg)),
 
     l_less_term: ($) =>
-      makeTerm($.l_less, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_less, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_not_equal_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "!=", field("source2", $.term_arg)),
 
     l_not_equal_term: ($) =>
-      makeTerm($.l_not_equal, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_not_equal, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     l_not_symbolic_term: ($) => seq("!", field("source", $.term_arg)),
 
-    l_not_term: ($) => makeTerm($.l_not, [["source", $.term_arg]]),
+    l_not_term: ($) => makeTerm($.l_not, { source: $.term_arg }),
 
     l_or_symbolic_term: ($) =>
       seq(field("source1", $.term_arg), "||", field("source2", $.term_arg)),
 
     l_or_term: ($) =>
-      makeTerm($.l_or, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-      ]),
+      makeTerm($.l_or, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+      }),
 
     load_table_term: ($) =>
-      makeTerm($.load_table, [
-        ["signature_string", $.term_arg],
-        ["oem_id_string", $.term_arg],
-        ["oem_table_id_string", $.term_arg],
-        ["root_path_string", $.term_arg, true],
-        ["parameter_path_string", $.term_arg, true],
-        ["parameter_data", $.term_arg, true],
-      ]),
+      makeTerm($.load_table, {
+        signature_string: $.term_arg,
+        oem_id_string: $.term_arg,
+        oem_table_id_string: $.term_arg,
+        root_path_string: optional($.term_arg),
+        parameter_path_string: optional($.term_arg),
+        parameter_data: optional($.term_arg),
+      }),
 
     load_term: ($) =>
-      makeTerm($.load, [
-        ["object", $.name_string],
-        ["result", $.super_name],
-      ]),
+      makeTerm($.load, {
+        object: $.name_string,
+        result: $.super_name,
+      }),
 
     local_term: (_) => /Local[0-7]/i,
 
     match_term: ($) =>
-      makeTerm($.match, [
-        ["search_package", $.term_arg],
-        ["op1", $.match_op_keyword],
-        ["match_object_1", $.term_arg],
-        ["op2", $.match_op_keyword],
-        ["match_object_2", $.term_arg],
-        ["start_index", $.term_arg],
-      ]),
+      makeTerm($.match, {
+        search_package: $.term_arg,
+        op1: $.match_op_keyword,
+        match_object_1: $.term_arg,
+        op2: $.match_op_keyword,
+        match_object_2: $.term_arg,
+        start_index: $.term_arg,
+      }),
 
     method_term: ($) =>
       makeTerm(
         $.method,
-        [
-          ["method_name", $.name_string],
-          ["num_args", $.byte_const_expr, true],
-          ["serialize_rule", $.serialize_rule_keyword, true],
-          ["sync_level", $.byte_const_expr, true],
-          ["return_type", $.parameter_type_package, true],
-          ["parameter_types", $.parameter_types_package, true],
-        ],
-        [["term_list", $.term_list]],
+        {
+          method_name: $.name_string,
+          num_args: optional($.byte_const_expr),
+          serialize_rule: optional($.serialize_rule_keyword),
+          sync_level: optional($.byte_const_expr),
+          return_type: optional($.parameter_type_package),
+          parameter_types: optional($.parameter_types_package),
+        },
+        { term_list: $.term_list },
       ),
 
     mid_term: ($) =>
-      makeTerm($.mid, [
-        ["source", $.term_arg],
-        ["index", $.term_arg],
-        ["length", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.mid, {
+        source: $.term_arg,
+        index: $.term_arg,
+        length: $.term_arg,
+        result: $.target,
+      }),
 
     mod_compound_term: ($) =>
       seq(
@@ -994,11 +985,11 @@ export default grammar({
       seq(field("dividend", $.term_arg), "%", field("divisor", $.term_arg)),
 
     mod_term: ($) =>
-      makeTerm($.mod, [
-        ["dividend", $.term_arg],
-        ["divisor", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.mod, {
+        dividend: $.term_arg,
+        divisor: $.term_arg,
+        result: $.target,
+      }),
 
     multiply_compound_term: ($) =>
       seq(
@@ -1015,53 +1006,53 @@ export default grammar({
       ),
 
     multiply_term: ($) =>
-      makeTerm($.multiply, [
-        ["multiplicand", $.term_arg],
-        ["multiplier", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.multiply, {
+        multiplicand: $.term_arg,
+        multiplier: $.term_arg,
+        result: $.target,
+      }),
 
     mutex_term: ($) =>
-      makeTerm($.mutex, [
-        ["mutex_name", $.name_string],
-        ["sync_level", $.byte_const_expr],
-      ]),
+      makeTerm($.mutex, {
+        mutex_name: $.name_string,
+        sync_level: $.byte_const_expr,
+      }),
 
     name_term: ($) =>
-      makeTerm($.name, [
-        ["object_name", $.name_string],
-        ["object", $.data_object],
-      ]),
+      makeTerm($.name, {
+        object_name: $.name_string,
+        object: $.data_object,
+      }),
 
     n_and_term: ($) =>
-      makeTerm($.n_and, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.n_and, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     no_op_term: ($) => $.no_op,
 
     n_or_term: ($) =>
-      makeTerm($.n_or, [
-        ["source1", $.term_arg],
-        ["source2", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.n_or, {
+        source1: $.term_arg,
+        source2: $.term_arg,
+        result: $.target,
+      }),
 
     notify_term: ($) =>
-      makeTerm($.notify, [
-        ["object", $.super_name],
-        ["notification_value", $.term_arg],
-      ]),
+      makeTerm($.notify, {
+        object: $.super_name,
+        notification_value: $.term_arg,
+      }),
 
     not_symbolic_term: ($) => seq("~", field("source", $.term_arg)),
 
     not_term: ($) =>
-      makeTerm($.not, [
-        ["source", $.term_arg],
-        ["result", $.target],
-      ]),
+      makeTerm($.not, {
+        source: $.term_arg,
+        result: $.target,
+      }),
 
     //TODO: O terms
 
