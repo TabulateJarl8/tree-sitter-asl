@@ -65,6 +65,7 @@ export default grammar({
     $.debug_term,
     $.no_op_term,
     $.timer_term,
+    $.user_def_region_space,
   ],
 
   rules: {
@@ -1335,6 +1336,161 @@ export default grammar({
       }),
 
     // 19.2.7 ASL Parameter Keyword Terms
+    // Most of this was generated from a web scraping of uefi.org that i did
+    attrib_bytes: ($) => makeTerm(/AttribBytes/i, { n: $.byte_const_expr }),
+    attrib_raw_bytes: ($) =>
+      makeTerm(/AttribRawBytes/i, { n: $.byte_const_expr }),
+    attrib_raw_process_bytes: ($) =>
+      makeTerm(/AttribRawProcessBytes/i, { n: $.byte_const_expr }),
+    access_attrib_keyword: ($) =>
+      choice(
+        /AttribQuick/i,
+        /AttribSendReceive/i,
+        /AttribByte/i,
+        $.attrib_bytes,
+        $.attrib_raw_bytes,
+        $.attrib_raw_process_bytes,
+        /AttribWord/i,
+        /AttribBlock/i,
+        /AttribProcessCall/i,
+        /AttribBlockProcessCall/i,
+      ),
+
+    access_type_keyword: (_) =>
+      choice(
+        /AnyAcc/i,
+        /ByteAcc/i,
+        /WordAcc/i,
+        /DWordAcc/i,
+        /QWordAcc/i,
+        /BufferAcc/i,
+      ),
+    address_keyword: (_) =>
+      choice(
+        /AddressRangeMemory/i,
+        /AddressRangeReserved/i,
+        /AddressRangeNVS/i,
+        /AddressRangeACPI/i,
+      ),
+    address_space_keyword: ($) => choice($.region_space_keyword, /FFixedHW/i),
+    addressing_mode_keyword: (_) =>
+      choice(/AddressingMode7Bit/i, /AddressingMode10Bit/i),
+    byte_length_keyword: (_) =>
+      choice(
+        /DataBitsFive/i,
+        /DataBitsSix/i,
+        /DataBitsSeven/i,
+        /DataBitsEight/i,
+        /DataBitsNine/i,
+      ),
+    bus_master_keyword: (_) => choice(/BusMaster/i, /NotBusMaster/i),
+    clock_phase_keyword: (_) => choice(/ClockPhaseFirst/i, /ClockPhaseSecond/i),
+    clock_polarity_keyword: (_) =>
+      choice(/ClockPolarityLow/i, /ClockPolarityHigh/i),
+    decode_keyword: (_) => choice(/SubDecode/i, /PosDecode/i),
+    endian_keyword: (_) => choice(/BigEndianing/i, /LittleEndian/i),
+    extended_access_attrib_keyword: (_) =>
+      choice(/AttribBytes/i, /AttribRawBytes/i, /AttribRawProcessBytes/i),
+    flow_control_keyword: (_) =>
+      choice(/FlowControlNone/i, /FlowControlXon/i, /FlowControlHardware/i),
+    interrupt_type_keyword: (_) => choice(/Edge/i, /Level/i),
+    interrupt_level: (_) => choice(/ActiveHigh/i, /ActiveLow/i),
+    interrupt_level_keyword: (_) =>
+      choice(/ActiveHigh/i, /ActiveLow/i, /ActiveBoth/i),
+    io_decode_keyword: (_) => choice(/Decode16/i, /Decode10/i),
+    io_restriction_keyword: (_) =>
+      choice(
+        /IoRestrictionNone/i,
+        /IoRestrictionInputOnly/i,
+        /IoRestrictionOutputOnly/i,
+        /IoRestrictionNoneAndPreserve/i,
+      ),
+    lock_rule_keyword: (_) => choice(/Lock/i, /NoLock/i),
+    match_op_keyword: (_) =>
+      choice(/MTR/i, /MEQ/i, /MLE/i, /MLT/i, /MGE/i, /MGT/i),
+    max_keyword: (_) => choice(/MaxFixed/i, /MaxNotFixed/i),
+    mem_type_keyword: (_) =>
+      choice(/Cacheable/i, /WriteCombining/i, /Prefetchable/i, /NonCacheable/i),
+    min_keyword: (_) => choice(/MinFixed/i, /MinNotFixed/i),
+    object_type_keyword: (_) =>
+      choice(
+        /UnknownObj/i,
+        /IntObj/i,
+        /StrObj/i,
+        /BuffObj/i,
+        /PkgObj/i,
+        /FieldUnitObj/i,
+        /DeviceObj/i,
+        /EventObj/i,
+        /MethodObj/i,
+        /MutexObj/i,
+        /OpRegionObj/i,
+        /PowerResObj/i,
+        /ThermalZoneObj/i,
+        /BuffFieldObj/i,
+      ),
+    parity_keyword: (_) =>
+      choice(
+        /ParityTypeNone/i,
+        /ParityTypeSpace/i,
+        /ParityTypeMark/i,
+        /ParityTypeOdd/i,
+        /ParityTypeEven/i,
+      ),
+    pin_config_keyword: (_) =>
+      choice(/PullDefault/i, /PullUp/i, /PullDown/i, /PullNone/i),
+    polarity_keyword: (_) => choice(/PolarityHigh/i, /PolarityLow/i),
+    range_type_keyword: (_) =>
+      choice(/ISAOnlyRanges/i, /NonISAOnlyRanges/i, /EntireRange/i),
+    read_write_keyword: (_) => choice(/ReadWrite/i, /ReadOnly/i),
+    region_space_keyword: (_) =>
+      choice(
+        /SystemIO/i,
+        /SystemMemory/i,
+        /PCI_Config/i,
+        /EmbeddedControl/i,
+        /SMBus/i,
+        /SystemCMOS/i,
+        /PciBarTarget/i,
+        /IPMI/i,
+        /GeneralPurposeIO/i,
+        /GenericSerialBus/i,
+        /PCC/i,
+      ),
+    resource_type_keyword: (_) =>
+      choice(/ResourceConsumer/i, /ResourceProducer/i),
+    serialize_rule_keyword: (_) => choice(/Serialized/i, /NotSerialized/i),
+    share_type_keyword: (_) =>
+      choice(/Shared/i, /Exclusive/i, /SharedAndWake/i, /ExclusiveAndWake/i),
+    slave_mode_keyword: (_) =>
+      choice(/ControllerInitiated/i, /DeviceInitiated/i),
+    stop_bits_keyword: (_) =>
+      choice(
+        /StopBitsZero/i,
+        /StopBitsOne/i,
+        /StopBitsOnePlusHalf/i,
+        /StopBitsTwo/i,
+      ),
+    transfer_width_keyword: (_) =>
+      choice(
+        /Width8Bit/i,
+        /Width16Bit/i,
+        /Width32Bit/i,
+        /Width64Bit/i,
+        /Width128Bit/i,
+        /Width256Bit/i,
+      ),
+    translation_keyword: (_) =>
+      choice(/SparseTranslation/i, /DenseTranslation/i),
+    type_keyword: (_) => choice(/TypeTranslation/i, /TypeStatic/i),
+    update_rule_keyword: (_) =>
+      choice(/Preserve/i, /WriteAsOnes/i, /WriteAsZeros/i),
+    user_def_region_space: ($) => $.integer_data,
+    xfer_type_keyword: (_) =>
+      choice(/Transfer8/i, /Transfer16/i, /Transfer8_16/i),
+    wire_mode_keyword: (_) => choice(/ThreeWireMode/i, /FourWireMode/i),
+
+    // 19.2.8 ASL Resource Template Terms
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
