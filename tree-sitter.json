@@ -1,0 +1,43 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "asl",
+      "camelcase": "Asl",
+      "title": "ASL",
+      "scope": "source.asl",
+      "file-types": [
+        "dsl",
+        "asl"
+      ],
+      "injection-regex": "^asl$",
+      "class-name": "TreeSitterAsl"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "ACPI Source Language",
+    "authors": [
+      {
+        "name": "Connor Sample",
+        "email": "tabulatejarl8@gmail.com",
+        "url": "https://tabulate.tech"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/TabulateJarl8/tree-sitter-asl",
+      "funding": "https://ko-fi.com/tabulate"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "java": false,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
+}

@@ -1,0 +1,1115 @@
+/**
+ * @file ACPI Source Language
+ * @author Connor Sample <tabulatejarl8@gmail.com>
+ * @license MIT
+ */
+
+/**
+ * Comma separated list of 1 or more entries
+ */
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(",", rule)));
+}
+
+/**
+ * Comma separated list of 0 or more entries
+ */
+function commaSep(rule) {
+  return optional(commaSep1(rule));
+}
+
+function makeTerm(keyword, args = [], block = null) {
+  const doField = (arg) => {
+    if (Array.isArray(arg) && arg.length === 2 && typeof arg[0] === "string") {
+      return field(arg[0], arg[1]);
+    }
+    return arg;
+  };
+
+  const commas = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const isOptional = Array.isArray(arg) && arg[2] === true;
+    const fielded = doField(arg);
+
+    if (i === 0) {
+      commas.push(isOptional ? optional(fielded) : fielded);
+    } else {
+      if (isOptional) {
+        commas.push(optional(seq(",", fielded)));
+      } else {
+        commas.push(",", fielded);
+      }
+    }
+  }
+
+  const parens = seq(keyword, "(", ...commas, ")");
+  if (!block) return parens;
+
+  return seq(parens, "{", ...block.map(doField), "}");
+}
+
+/// <reference types="tree-sitter-cli/dsl" />
+// @ts-check
+
+export default grammar({
+  name: "asl",
+
+  inline: ($) => [
+    $.word_const,
+    $.byte_const,
+    $.dword_const,
+    $.qword_const,
+    $.byte_const_expr,
+    $.word_const_expr,
+    $.dword_const_expr,
+    $.qword_const_expr,
+    $.true,
+    $.false,
+    $.break_point,
+    $.break,
+    $.continue_term,
+    $.debug_term,
+  ],
+
+  rules: {
+    source_file: ($) => "hello",
+    // 19.2.2 ASL Name and Pathname Terms
+    _lead_name_char: (_) => /[A-Za-z_]/,
+    _digit_char: (_) => /[0-9]/,
+    _name_char: ($) => choice($.digit_char, $.lead_name_char),
+    _root_char: (_) => "\\",
+    _parent_prefix_char: (_) => "^",
+    _path_separator_char: (_) => ".",
+    _comma_char: (_) => ",",
+    _semicolon_delimiter: (_) => optional(";"),
+    name_seg: ($) =>
+      seq(
+        $._lead_name_char,
+        optional($._name_char),
+        optional($._name_char),
+        optional($._name_char),
+      ),
+    name_string: ($) =>
+      choice(
+        seq($._root_char, $.name_path),
+        seq($._parent_prefix_char, $.prefix_path, $.name_path),
+        $.non_empty_name_path,
+      ),
+    name_path: ($) => optional(seq($.name_seg, $.name_path_trail)),
+    name_path_trail: ($) =>
+      optional(seq($._path_separator_char, $.name_seg, $.name_path_trail)),
+    non_empty_name_path: ($) =>
+      choice($.name_seg, seq($.name_seg, $.name_path_trail)),
+    prefix_path: ($) => optional(seq($._parent_prefix_char, $.prefix_path)),
+
+    // 19.2.3 ASL Root and Secondary Terms
+    // Root Terms
+    asl_code: ($) => $.definition_block_list,
+    definition_block_list: ($) =>
+      choice(
+        $.definition_block_term,
+        seq($.definition_block_term, $.definition_block_list),
+      ),
+    // Major Terms
+    super_name: ($) =>
+      choice(
+        $.name_string,
+        $.arg_term,
+        $.local_term,
+        $.debug_term,
+        $.reference_type_opcode,
+        $.method_invocation_term,
+      ),
+    target: ($) => optional($.super_name),
+    term_arg: ($) =>
+      choice(
+        $.expression_opcode,
+        $.data_object,
+        $.arg_term,
+        $.local_term,
+        $.name_string,
+        $.symbolic_expression,
+      ),
+    method_invocation_term: ($) => seq($.name_string, "(", $.arg_list, ")"),
+
+    // List Terms
+    arg_list: ($) => commaSep($.term_arg),
+    byte_list: ($) => commaSep($.byte_const_expr),
+    dword_list: ($) => commaSep($.dword_const_expr),
+
+    extended_access_attrib_term: ($) =>
+      seq($.extended_access_attrib_keyword, "(", $.access_length, ")"),
+
+    field_unit_list: ($) => commaSep($.field_unit),
+    field_unit: ($) =>
+      choice(
+        $.field_unit_entry,
+        $.offset_term,
+        $.access_as_term,
+        $.connection_term,
+      ),
+    field_unit_entry: ($) =>
+      seq(optional($.name_seg), $._comma_char, $.integer),
+
+    package_list: ($) => commaSep($.package_element),
+    package_element: ($) => choice($.data_object, $.name_string),
+
+    parameter_type_package: ($) =>
+      choice(
+        $.object_type_keyword,
+        seq("{", optional($.parameter_type_package_list), "}"),
+      ),
+    parameter_type_package_list: ($) => commaSep1($.object_type_keyword),
+
+    parameter_types_package: ($) =>
+      choice(
+        $.object_type_keyword,
+        seq("{", optional($.parameter_types_package_list), "}"),
+      ),
+    parameter_types_package_list: ($) => commaSep1($.parameter_type_package),
+    term_list: ($) => repeat(seq($.term, optional($._semicolon_delimiter))),
+    term: ($) =>
+      choice(
+        $.object,
+        $.statement_opcode,
+        $.expression_opcode,
+        $.symbolic_expression,
+      ),
+    object: ($) =>
+      choice($.compiler_directive, $.named_object, $.name_space_modifier),
+
+    // Conditional Execution List Terms
+    case_term_list: ($) =>
+      seq(
+        // Nothing | CaseTerm | CaseTerm CaseTermList
+        repeat($.case_term),
+        // DefaultTerm DefaultTermList
+        optional(seq($.default_term, $.default_term_list)),
+      ),
+    default_term_list: ($) => repeat($.case_term),
+    if_else_term: ($) => seq($.if_term, $.else_term),
+
+    // 19.2.4 ASL Data and Constant Terms
+    // Numeric Value Terms
+    // _lead_digit_char: (_) => /[1-9]/,
+    // _hex_digit_char: (_) => /[0-9A-Fa-f]/,
+    // _octal_digit_char: (_) => /[0-7]/,
+    _null_char: (_) => token("\0"),
+
+    // Data Terms
+    buffer_data: ($) => choice($.buffer_type_opcode, $.buffer_term),
+    computational_data: ($) =>
+      choice($.buffer_data, $.integer_data, $.string_data),
+    data_object: ($) =>
+      choice($.buffer_data, $.package_data, $.integer_data, $.string_data),
+    data_ref_object: ($) => choice($.data_object, $.object_reference),
+    integer_data: ($) => choice($.integer_type_opcode, $.integer, $.const_term),
+    package_data: ($) => $.package_term,
+    string_data: ($) => choice($.string_type_opcode, $.string),
+
+    // Integer Terms
+    integer: ($) => choice($.decimal_const, $.octal_const, $.hex_const),
+    decimal_const: (_) => /[1-9][0-9]*/,
+    octal_const: (_) => /0[0-7]*/,
+    hex_const: (_) => /0[xX][0-9A-Fa-f]+/,
+
+    byte_const: ($) => $.integer,
+    word_const: ($) => $.integer,
+    dword_const: ($) => $.integer,
+    qword_const: ($) => $.integer,
+
+    byte_const_expr: ($) =>
+      choice($.integer_type_opcode, $.const_expr_term, $.integer),
+    word_const_expr: ($) =>
+      choice($.integer_type_opcode, $.const_expr_term, $.integer),
+    dword_const_expr: ($) =>
+      choice($.integer_type_opcode, $.const_expr_term, $.integer),
+    qword_const_expr: ($) =>
+      choice($.integer_type_opcode, $.const_expr_term, $.integer),
+
+    const_term: ($) => choice($.const_expr_term, $.revision),
+    const_expr_term: ($) => choice($.zero, $.one, $.ones),
+
+    // String Terms
+    string: ($) => seq('"', $._utf8_char_list, '"'),
+    _utf8_char_list: ($) => repeat(choice($._escape_sequence, $._utf8_char)),
+    _utf8_char: (_) => /[^"\\\0]+/,
+
+    // Eescape sequences
+    _escape_sequence: ($) =>
+      choice(
+        $._simple_escape_sequence,
+        $._octal_escape_sequence,
+        $._hex_escape_sequence,
+      ),
+    _simple_escape_sequence: (_) => /\\['"abfnrtv\\]/,
+    _hex_escape_sequence: (_) => /\\x[0-9A-Fa-f]{1,2}/,
+    _octal_escape_sequence: (_) => /\\[0-7]{1,3}/,
+
+    // Misc Data Type Terms
+    object_reference: ($) => $.integer,
+    boolean: ($) => choice($.true, $.false),
+    true: ($) => $.ones,
+    false: ($) => $.zero,
+
+    // Symbolic Operator terms
+    operators: (_) =>
+      choice("+", "-", "*", "/", "%", "&", "|", "^", "~", "<", ">", "!", "="),
+    compound_operators: (_) =>
+      choice(
+        "<<",
+        ">>",
+        "++",
+        "--", // this is '-' in the spec and i think thats wrong
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "%=",
+        "<<=",
+        ">>=",
+        "&=",
+        "|=",
+        "^=",
+      ),
+
+    // 19.2.5 ASL Opcode Terms
+    compiler_directive: ($) => choice($.include_term, $.external_term),
+    named_object: ($) =>
+      choice(
+        $.bank_field_term,
+        $.create_bit_field_term,
+        $.create_byte_field_term,
+        $.create_dword_field_term,
+        $.create_field_term,
+        $.create_qword_field_term,
+        $.create_word_field_term,
+        $.data_region_term,
+        $.device_term,
+        $.event_term,
+        $.field_term,
+        $.function_term,
+        $.index_field_term,
+        $.method_term,
+        $.mutex_term,
+        $.op_region_term,
+        $.power_res_term,
+        $.processor_term,
+        $.thermal_zone_term,
+      ),
+    name_space_modifier: ($) => choice($.alias_term, $.name_term, $.scope_term),
+    symbolic_expression_term: ($) =>
+      choice(
+        seq("(", $.term_arg, ")"),
+        $.add_symbolic_term,
+        $.and_symbolic_term,
+        $.dec_symbolic_term,
+        $.divide_symbolic_term,
+        $.inc_symbolic_term,
+        $.l_and_symbolic_term,
+        $.l_equal_symbolic_term,
+        $.l_greater_equal_symbolic_term,
+        $.l_greater_symbolic_term,
+        $.l_less_equal_symbolic_term,
+        $.l_less_symbolic_term,
+        $.l_not_equal_symbolic_term,
+        $.l_not_symbolic_term,
+        $.l_or_symbolic_term,
+        $.mod_symbolic_term,
+        $.multiply_symbolic_term,
+        $.not_symbolic_term,
+        $.or_symbolic_term,
+        $.shift_left_symbolic_term,
+        $.shift_right_symbolic_term,
+        $.subtract_symbolic_term,
+        $.xor_symbolic_term,
+      ),
+
+    symbolic_assignment_term: ($) =>
+      choice(
+        $.store_symbolic_term,
+        $.add_compound_term,
+        $.and_compound_term,
+        $.divide_compound_term,
+        $.mod_compound_term,
+        $.multiply_compound_term,
+        $.or_compound_term,
+        $.shift_left_compound_term,
+        $.shift_right_compound_term,
+        $.subtract_compound_term,
+        $.xor_compound_term,
+      ),
+
+    statement_opcode: ($) =>
+      choice(
+        $.break_term,
+        $.break_point_term,
+        $.continue_term,
+        $.fatal_term,
+        $.for_term,
+        $.if_else_term,
+        $.no_op_term,
+        $.notify_term,
+        $.release_term,
+        $.reset_term,
+        $.return_term,
+        $.signal_term,
+        $.sleep_term,
+        $.stall_term,
+        $.switch_term,
+        $.unload_term,
+        $.while_term,
+      ),
+
+    expression_opcode: ($) =>
+      choice(
+        $.acquire_term,
+        $.add_term,
+        $.and_term,
+        $.concat_term,
+        $.concat_res_term,
+        $.cond_ref_of_term,
+        $.copy_object_term,
+        $.dec_term,
+        $.deref_of_term,
+        $.divide_term,
+        $.find_set_left_bit_term,
+        $.find_set_right_bit_term,
+        $.fprintf_term,
+        $.from_bcd_term,
+        $.inc_term,
+        $.index_term,
+        $.l_and_term,
+        $.l_equal_term,
+        $.l_greater_term,
+        $.l_greater_equal_term,
+        $.l_less_term,
+        $.l_less_equal_term,
+        $.l_not_term,
+        $.l_not_equal_term,
+        $.l_or_term,
+        $.match_term,
+        $.mid_term,
+        $.mod_term,
+        $.multiply_term,
+        $.n_and_term,
+        $.n_or_term,
+        $.not_term,
+        $.object_type_term,
+        $.or_term,
+        $.printf_term,
+        $.ref_of_term,
+        $.shift_left_term,
+        $.shift_right_term,
+        $.size_of_term,
+        $.store_term,
+        $.subtract_term,
+        $.timer_term,
+        $.to_bcd_term,
+        $.to_buffer_term,
+        $.to_decimal_string_term,
+        $.to_hex_string_term,
+        $.to_integer_term,
+        $.to_string_term,
+        $.wait_term,
+        $.xor_term,
+        $.method_invocation_term,
+        $.symbolic_expression_term,
+        $.symbolic_assignment_term,
+      ),
+
+    integer_type_opcode: ($) =>
+      choice(
+        $.add_term,
+        $.and_term,
+        $.dec_term,
+        $.deref_of_term,
+        $.divide_term,
+        $.eisaid_term,
+        $.find_set_left_bit_term,
+        $.find_set_right_bit_term,
+        $.from_bcd_term,
+        $.inc_term,
+        $.l_and_term,
+        $.l_equal_term,
+        $.l_greater_term,
+        $.l_greater_equal_term,
+        $.l_less_term,
+        $.l_less_equal_term,
+        $.l_not_term,
+        $.l_not_equal_term,
+        $.match_term,
+        $.mod_term,
+        $.multiply_term,
+        $.n_and_term,
+        $.n_or_term,
+        $.not_term,
+        $.or_term,
+        $.shift_left_term,
+        $.shift_right_term,
+        $.subtract_term,
+        $.to_bcd_term,
+        $.to_integer_term,
+        $.xor_term,
+        $.symbolic_expression_term,
+      ),
+
+    string_type_opcode: ($) =>
+      choice(
+        $.concat_term,
+        $.deref_of_term,
+        $.fprintf_term,
+        $.mid_term,
+        $.printf_term,
+        $.to_decimal_string_term,
+        $.to_hex_string_term,
+        $.to_string_term,
+      ),
+
+    buffer_type_opcode: ($) =>
+      choice(
+        $.concat_term,
+        $.concat_res_term,
+        $.deref_of_term,
+        $.mid_term,
+        // TODO: this is a macro
+        // $.resource_template_term,
+        $.to_buffer_term,
+        $.to_pld_term,
+        $.to_uuid_term,
+        $.unicode_term,
+      ),
+
+    reference_type_opcode: ($) =>
+      choice(
+        $.ref_of_term,
+        $.deref_of_term,
+        $.index_term,
+        $.index_symbolic_term,
+        // TODO: find the def for this
+        //$.user_term_obj,
+      ),
+
+    // 19.2.6 ASL Primary (Terminal) Terms
+    _access_attribute: ($) =>
+      choice(
+        $.byte_const_expr,
+        $.access_attrib_keyword,
+        $.extended_access_attrib_term,
+      ),
+    access_as_term: ($) =>
+      seq(
+        $.access_as,
+        "(",
+        field("access_type", $.access_type_keyword),
+        optional(
+          seq($._comma_char, field("access_attribute", $._access_attribute)),
+        ),
+        ")",
+      ),
+
+    acquire_term: ($) =>
+      makeTerm($.acquire, [
+        ["sync_object", $.super_name],
+        ["timeout_value", $.word_const_expr],
+      ]),
+
+    add_compound_term: ($) =>
+      seq(
+        field("addend1_result", $.term_arg),
+        "+=",
+        field("addend2", $.term_arg),
+      ),
+
+    add_symbolic_term: ($) =>
+      seq(field("addend1", $.term_arg), "+", field("addend2", $.term_arg)),
+
+    add_term: ($) =>
+      makeTerm($.add, [
+        ["addend1", $.term_arg],
+        ["addend2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    alias_term: ($) =>
+      makeTerm($.alias, [
+        ["source_object", $.name_string],
+        ["alias_object", $.name_string],
+      ]),
+
+    and_compound_term: ($) =>
+      seq(
+        field("source1_result", $.term_arg),
+        "&=",
+        field("source2", $.term_arg),
+      ),
+
+    and_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "&", field("source2", $.term_arg)),
+
+    and_term: ($) =>
+      makeTerm($.and, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    arg_term: (_) => /Arg[0-6]/i,
+
+    bank_field_term: ($) =>
+      makeTerm(
+        $.bank_field,
+        [
+          ["region_name", $.name_string],
+          ["bank_name", $.name_string],
+          ["bank_value", $.term_arg],
+          ["access_type", $.access_type_keyword],
+          ["lock_rule", $.lock_rule_keyword],
+          ["update_rule", $.update_rule_keyword],
+        ],
+        [["field_unit_list", $.field_unit_list]],
+      ),
+
+    break_point_term: ($) => $.break_point,
+    break_term: ($) => $.break,
+
+    buffer_term: ($) =>
+      makeTerm(
+        $.buffer,
+        [["buff_size", optional($.term_arg)]],
+        [[choice($.string_data, $.byte_list)]],
+      ),
+
+    case_term: ($) =>
+      makeTerm(
+        $.case,
+        [["value", $.data_object]],
+        [["term_list", $.term_list]],
+      ),
+
+    concat_res_term: ($) =>
+      makeTerm($.concatenate_res_template, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    concat_term: ($) =>
+      makeTerm($.concatenate, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    connection_term: ($) =>
+      makeTerm($.connection, [
+        ["connection_resource", choice($.name_string, $.resource_macro_term)],
+      ]),
+
+    cond_ref_of_term: ($) =>
+      makeTerm($.cond_ref_of, [
+        [
+          "source",
+          choice($.name_string, $.arg_term, $.local_term, $.deref_of_term),
+        ],
+        ["destination", $.target],
+      ]),
+
+    continue_term: ($) => $.continue,
+
+    copy_object_term: ($) =>
+      makeTerm($.copy_object, [
+        ["source", $.term_arg],
+        ["result", choice($.name_string, $.local_term, $.arg_term)],
+      ]),
+
+    create_bit_field_term: ($) =>
+      makeTerm($.create_bit_field, [
+        ["source_buffer", $.term_arg],
+        ["bit_index", $.term_arg],
+        ["bit_field_name", $.name_string],
+      ]),
+    create_byte_field_term: ($) =>
+      makeTerm($.create_byte_field, [
+        ["source_buffer", $.term_arg],
+        ["byte_index", $.term_arg],
+        ["byte_field_name", $.name_string],
+      ]),
+    create_dword_field_term: ($) =>
+      makeTerm($.create_dword_field, [
+        ["source_buffer", $.term_arg],
+        ["byte_index", $.term_arg],
+        ["dword_field_name", $.name_string],
+      ]),
+    create_qword_field_term: ($) =>
+      makeTerm($.create_qword_field, [
+        ["source_buffer", $.term_arg],
+        ["byte_index", $.term_arg],
+        ["qword_field_name", $.name_string],
+      ]),
+    create_word_field_term: ($) =>
+      makeTerm($.create_word_field, [
+        ["source_buffer", $.term_arg],
+        ["byte_index", $.term_arg],
+        ["word_field_name", $.name_string],
+      ]),
+
+    data_region_term: ($) =>
+      makeTerm($.data_table_region, [
+        ["region_name", $.name_string],
+        ["signature_string", $.term_arg],
+        ["oem_id_string", $.term_arg],
+        ["oem_table_id_string", $.term_arg],
+      ]),
+
+    debug_term: ($) => $.debug,
+
+    dec_symbolic_term: ($) => seq(field("minuend", $.super_name), "--"),
+
+    dec_term: ($) => makeTerm($.decrement, [["minuend", $.super_name]]),
+
+    default_term: ($) => seq($.default, "{", $.term_list, "}"),
+
+    definition_block_term: ($) =>
+      makeTerm(
+        $.definition_block,
+        [
+          ["aml_file_name", $.string],
+          ["table_signature", $.string],
+          ["compliance_revision", $.byte_const],
+          ["oem_id", $.string],
+          ["table_id", $.string],
+          ["oem_revision", $.dword_const],
+        ],
+        [[$.term_list]],
+      ),
+
+    _deref_of_source: ($) =>
+      choice(
+        $.name_string,
+        $.arg_term,
+        $.local_term,
+        $.ref_of_term,
+        $.cond_ref_of_term,
+        $.index_term,
+        $.method_invocation_term,
+      ),
+    deref_of_term: ($) =>
+      makeTerm($.deref_of, [["source", $._deref_of_source]]),
+
+    device_term: ($) =>
+      makeTerm(
+        $.device,
+        [["device_name", $.name_string]],
+        [["term_list", $.term_list]],
+      ),
+
+    divide_compound_term: ($) =>
+      seq(
+        field("dividend_result", $.term_arg),
+        "/=",
+        field("divisor", $.term_arg),
+      ),
+
+    divide_symbolic_term: ($) =>
+      seq(field("dividend", $.term_arg), "/", field("divisor", $.term_arg)),
+
+    divide_term: ($) =>
+      makeTerm($.divide, [
+        ["dividend", $.term_arg],
+        ["divisor", $.term_arg],
+        ["remainder", $.target],
+        ["result", $.target],
+      ]),
+
+    eisa_id_term: ($) =>
+      makeTerm($.eisa_id, [["eisa_id_string", $.string_data]]),
+
+    _else_else_if: ($) => choice($.else_term, $.else_if_term),
+
+    else_if_term: ($) =>
+      seq(
+        makeTerm(
+          $.else_if,
+          [["predicate", $.term_arg]],
+          [["term_list", $.term_list]],
+        ),
+        optional($._else_else_if),
+      ),
+
+    // WARN: this deviates from the spec a little because ebnf is weird
+    // NOTE: optionality should be handled in the parent rule
+    else_term: ($) => seq($.else, "{", field("term_list", $.term_list), "}"),
+
+    event_term: ($) => makeTerm($.event, [["event_name", $.name_string]]),
+
+    external_term: ($) =>
+      makeTerm($.external, [
+        ["obj_name", $.name_string],
+        ["obj_type", $.object_type_keyword, true],
+        ["result_type", $.parameter_type_package, true],
+        ["parameter_types", $.parameter_types_package, true],
+      ]),
+
+    fatal_term: ($) =>
+      makeTerm($.fatal, [
+        ["type", $.byte_const_expr],
+        ["code", $.dword_const_expr],
+        ["arg", $.term_arg],
+      ]),
+
+    field_term: ($) =>
+      makeTerm(
+        $.field,
+        [
+          ["region_name", $.name_string],
+          ["access_type", $.access_type_keyword],
+          ["lock_rule", $.lock_rule_keyword],
+          ["update_rule", $.update_rule_keyword],
+        ],
+        [["field_unit_list", $.field_unit_list]],
+      ),
+
+    find_set_left_bit_term: ($) =>
+      makeTerm($.find_set_left_bit, [
+        ["source", $.term_arg],
+        ["result", $.target],
+      ]),
+    find_set_right_bit_term: ($) =>
+      makeTerm($.find_set_right_bit, [
+        ["source", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    for_term: ($) =>
+      makeTerm(
+        $.for,
+        [
+          ["initialize", $.term_arg, true],
+          ["predicate", $.term_arg, true],
+          ["update", $.term_arg, true],
+        ],
+        [["term_list", $.term_list]],
+      ),
+
+    fprintf_term: ($) =>
+      makeTerm($.fprintf, [
+        ["term_arg", $.term_arg],
+        ["string", $.string],
+        ["printf_arg_list", $.printf_arg_list],
+      ]),
+
+    from_bcd_term: ($) =>
+      makeTerm($.from_bcd, [
+        ["bcd_value", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    function_term: ($) =>
+      makeTerm(
+        $.function,
+        [
+          ["function_name", $.name_string],
+          ["return_type", $.parameter_type_package, true],
+          ["parameter_types", $.parameter_types_package, true],
+        ],
+        [["term_list", $.term_list]],
+      ),
+
+    if_term: ($) =>
+      makeTerm($.if, [["predicate", $.term_arg]], [["term_list", $.term_list]]),
+
+    include_term: ($) =>
+      makeTerm($.include, [["file_path_name", $.string_data]]),
+
+    inc_symbolic_term: ($) => seq(field("addend", $.super_name), "++"),
+
+    inc_term: ($) => makeTerm($.increment, [["addend", $.super_name]]),
+
+    index_field_term: ($) =>
+      makeTerm(
+        $.index_field,
+        [
+          ["index_name", $.name_string],
+          ["data_name", $.name_string],
+          ["access_type", $.access_type_keyword],
+          ["lock_rule", $.lock_rule_keyword],
+          ["update_rule", $.update_rule_keyword],
+        ],
+        [["field_unit_list", $.field_unit_list]],
+      ),
+
+    index_symbolic_term: ($) =>
+      seq(field("source", $.term_arg), "[", field("index", $.term_arg), "]"),
+
+    index_term: ($) =>
+      makeTerm($.index, [
+        ["source", $.term_arg],
+        ["index", $.term_arg],
+        ["destination", $.target],
+      ]),
+
+    l_and_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "&&", field("source2", $.term_arg)),
+
+    l_and_term: ($) =>
+      makeTerm($.l_and, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_equal_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "==", field("source2", $.term_arg)),
+
+    l_equal_term: ($) =>
+      makeTerm($.l_equal, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_greater_equal_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), ">=", field("source2", $.term_arg)),
+
+    l_greater_equal_term: ($) =>
+      makeTerm($.l_greater_equal, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_greater_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), ">", field("source2", $.term_arg)),
+
+    l_greater_term: ($) =>
+      makeTerm($.l_greater, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_less_equal_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "<=", field("source2", $.term_arg)),
+
+    l_less_equal_term: ($) =>
+      makeTerm($.l_less_equal, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_less_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "<", field("source2", $.term_arg)),
+
+    l_less_term: ($) =>
+      makeTerm($.l_less, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_not_equal_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "!=", field("source2", $.term_arg)),
+
+    l_not_equal_term: ($) =>
+      makeTerm($.l_not_equal, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    l_not_symbolic_term: ($) => seq("!", field("source", $.term_arg)),
+
+    l_not_term: ($) => makeTerm($.l_not, [["source", $.term_arg]]),
+
+    l_or_symbolic_term: ($) =>
+      seq(field("source1", $.term_arg), "||", field("source2", $.term_arg)),
+
+    l_or_term: ($) =>
+      makeTerm($.l_or, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+      ]),
+
+    load_table_term: ($) =>
+      makeTerm($.load_table, [
+        ["signature_string", $.term_arg],
+        ["oem_id_string", $.term_arg],
+        ["oem_table_id_string", $.term_arg],
+        ["root_path_string", $.term_arg, true],
+        ["parameter_path_string", $.term_arg, true],
+        ["parameter_data", $.term_arg, true],
+      ]),
+
+    load_term: ($) =>
+      makeTerm($.load, [
+        ["object", $.name_string],
+        ["result", $.super_name],
+      ]),
+
+    local_term: (_) => /Local[0-7]/i,
+
+    // TODO: starting at M
+
+    // ASL Operators (all case insensitive)
+    // Table 19.16 ASL compiler controls
+    external: (_) => /External/i,
+    include: (_) => /Include/i,
+    // Table 19.17 ACPI table management
+    definition_block: (_) => /DefinitionBlock/i,
+    load_table: (_) => /LoadTable/i,
+    load: (_) => /Load/i,
+    // Table 19.18 Miscellaneous named object creation
+    alias: (_) => /Alias/i,
+    buffer: (_) => /Buffer/i,
+    device: (_) => /Device/i,
+    function: (_) => /Function/i,
+    method: (_) => /Method/i,
+    name: (_) => /Name/i,
+    package: (_) => /Package/i,
+    power_resource: (_) => /PowerResource/i,
+    processor: (_) => /Processor/i,
+    raw_data_buffer: (_) => /RawDataBuffer/i,
+    scope: (_) => /Scope/i,
+    thermal_zone: (_) => /ThermalZone/i,
+    // Table 19.19 Operation Regions and Fields
+    access_as: (_) => /AccessAs/i,
+    bank_field: (_) => /BankField/i,
+    connection: (_) => /Connection/i,
+    data_table_region: (_) => /DataTableRegion/i,
+    field: (_) => /Field/i,
+    index_field: (_) => /IndexField/i,
+    offset: (_) => /Offset/i,
+    operation_region: (_) => /OperationRegion/i,
+    // Table 19.20 Buffer Fields
+    create_bit_field: (_) => /CreateBitField/i,
+    create_byte_field: (_) => /CreateByteField/i,
+    create_dword_field: (_) => /CreateDWordField/i,
+    create_field: (_) => /CreateField/i,
+    create_qword_field: (_) => /CreateQWordField/i,
+    create_word_field: (_) => /CreateWordField/i,
+    // Table 19.21 Synchronization
+    acquire: (_) => /Acquire/i,
+    event: (_) => /Event/i,
+    mutex: (_) => /Mutex/i,
+    notify: (_) => /Notify/i,
+    release: (_) => /Release/i,
+    reset: (_) => /Reset/i,
+    signal: (_) => /Signal/i,
+    wait: (_) => /Wait/i,
+    // Table 19.22 Object references
+    cond_ref_of: (_) => /CondRefOf/i,
+    deref_of: (_) => /DerefOf/i,
+    ref_of: (_) => /RefOf/i,
+    // Table 19.23 Integer arithmetic
+    add: (_) => /Add/i,
+    and: (_) => /And/i,
+    decrement: (_) => /Decrement/i,
+    divide: (_) => /Divide/i,
+    find_set_left_bit: (_) => /FindSetLeftBit/i,
+    find_set_right_bit: (_) => /FindSetRightBit/i,
+    increment: (_) => /Increment/i,
+    mod: (_) => /Mod/i,
+    multiply: (_) => /Multiply/i,
+    n_and: (_) => /NAnd/i,
+    n_or: (_) => /NOr/i,
+    not: (_) => /Not/i,
+    or: (_) => /Or/i,
+    shift_left: (_) => /ShiftLeft/i,
+    shift_right: (_) => /ShiftRight/i,
+    subtract: (_) => /Subtract/i,
+    xor: (_) => /Xor/i,
+    // Table 19.24 Logical operators
+    l_and: (_) => /LAnd/i,
+    l_equal: (_) => /LEqual/i,
+    l_greater: (_) => /LGreater/i,
+    l_greater_equal: (_) => /LGreaterEqual/i,
+    l_less: (_) => /LLess/i,
+    l_less_equal: (_) => /LLessEqual/i,
+    l_not: (_) => /LNot/i,
+    l_not_equal: (_) => /LNotEqual/i,
+    l_or: (_) => /LOr/i,
+    // Table 19.25 Method execution control
+    break: (_) => /Break/i,
+    break_point: (_) => /BreakPoint/i,
+    case: (_) => /Case/i,
+    continue: (_) => /Continue/i,
+    default: (_) => /Default/i,
+    else: (_) => /Else/i,
+    else_if: (_) => /ElseIf/i,
+    fatal: (_) => /Fatal/i,
+    if: (_) => /If/i,
+    no_op: (_) => /NoOp/i,
+    return: (_) => /Return/i,
+    sleep: (_) => /Sleep/i,
+    stall: (_) => /Stall/i,
+    switch: (_) => /Switch/i,
+    while: (_) => /While/i,
+    // Table 19.26 Data type conversion and manipulation
+    concatenate: (_) => /Concatenate/i,
+    copy_object: (_) => /CopyObject/i,
+    debug: (_) => /Debug/i,
+    eisa_id: (_) => /EisaId/i,
+    fprintf: (_) => /Fprintf/i,
+    from_bcd: (_) => /FromBCD/i,
+    index: (_) => /Index/i,
+    match: (_) => /Match/i,
+    mid: (_) => /Mid/i,
+    object_type: (_) => /ObjectType/i,
+    printf: (_) => /Printf/i,
+    size_of: (_) => /SizeOf/i,
+    store: (_) => /Store/i,
+    timer: (_) => /Timer/i,
+    to_bcd: (_) => /ToBCD/i,
+    to_buffer: (_) => /ToBuffer/i,
+    to_decimal_string: (_) => /ToDecimalString/i,
+    to_hex_string: (_) => /ToHexString/i,
+    to_integer: (_) => /ToInteger/i,
+    to_pld: (_) => /ToPLD/i,
+    to_string: (_) => /ToString/i,
+    to_uuid: (_) => /ToUUID/i,
+    unicode: (_) => /Unicode/i,
+    // Table 19.27 Resource Descriptor macros
+    concatenate_res_template: (_) => /ConcatenateResTemplate/i,
+    dma: (_) => /DMA/i,
+    dword_io: (_) => /DWordIO/i,
+    dword_memory: (_) => /DWordMemory/i,
+    dword_space: (_) => /DWordSpace/i,
+    end_dependent_fn: (_) => /EndDependentFn/i,
+    extended_io: (_) => /ExtendedIO/i,
+    extended_memory: (_) => /ExtendedMemory/i,
+    extended_space: (_) => /ExtendedSpace/i,
+    fixed_dma: (_) => /FixedDMA/i,
+    fixed_io: (_) => /FixedIO/i,
+    gpio_int: (_) => /GpioInt/i,
+    gpio_io: (_) => /GpioIO/i,
+    i2c_serial_bus_v2: (_) => /I2CSerialBusV2/i,
+    interrupt: (_) => /Interrupt/i,
+    io: (_) => /IO/i,
+    irq: (_) => /IRQ/i,
+    irq_no_flags: (_) => /IRQNoFlags/i,
+    memory_24: (_) => /Memory24/i,
+    memory_32: (_) => /Memory32/i,
+    memory_32_fixed: (_) => /Memory32Fixed/i,
+    qword_io: (_) => /QWordIO/i,
+    qword_memory: (_) => /QWordMemory/i,
+    qword_space: (_) => /QWordSpace/i,
+    register: (_) => /Register/i,
+    resource_template: (_) => /ResourceTemplate/i,
+    spi_serial_bus_v2: (_) => /SPISerialBusV2/i,
+    start_dependent_fn: (_) => /StartDependentFn/i,
+    start_dependent_fn_no_pri: (_) => /StartDependentFnNoPri/i,
+    uart_serial_bus_v2: (_) => /UARTSerialBusV2/i,
+    vendor_long: (_) => /VendorLong/i,
+    vendor_short: (_) => /VendorShort/i,
+    word_bus_number: (_) => /WordBusNumber/i,
+    word_io: (_) => /WordIO/i,
+    word_space: (_) => /WordSpace/i,
+    // Table 19.28 Constants
+    one: (_) => /One/i,
+    ones: (_) => /Ones/i,
+    revision: (_) => /Revision/i,
+    zero: (_) => /Zero/i,
+  },
+});
