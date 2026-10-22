@@ -70,6 +70,7 @@ export default grammar({
     $.break,
     $.continue_term,
     $.debug_term,
+    $.no_op_term,
   ],
 
   rules: {
@@ -950,7 +951,119 @@ export default grammar({
 
     local_term: (_) => /Local[0-7]/i,
 
-    // TODO: starting at M
+    match_term: ($) =>
+      makeTerm($.match, [
+        ["search_package", $.term_arg],
+        ["op1", $.match_op_keyword],
+        ["match_object_1", $.term_arg],
+        ["op2", $.match_op_keyword],
+        ["match_object_2", $.term_arg],
+        ["start_index", $.term_arg],
+      ]),
+
+    method_term: ($) =>
+      makeTerm(
+        $.method,
+        [
+          ["method_name", $.name_string],
+          ["num_args", $.byte_const_expr, true],
+          ["serialize_rule", $.serialize_rule_keyword, true],
+          ["sync_level", $.byte_const_expr, true],
+          ["return_type", $.parameter_type_package, true],
+          ["parameter_types", $.parameter_types_package, true],
+        ],
+        [["term_list", $.term_list]],
+      ),
+
+    mid_term: ($) =>
+      makeTerm($.mid, [
+        ["source", $.term_arg],
+        ["index", $.term_arg],
+        ["length", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    mod_compound_term: ($) =>
+      seq(
+        field("dividend_result", $.term_arg),
+        "%=",
+        field("divisor", $.term_arg),
+      ),
+
+    mod_symbolic_term: ($) =>
+      seq(field("dividend", $.term_arg), "%", field("divisor", $.term_arg)),
+
+    mod_term: ($) =>
+      makeTerm($.mod, [
+        ["dividend", $.term_arg],
+        ["divisor", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    multiply_compound_term: ($) =>
+      seq(
+        field("multiplicand_result", $.term_arg),
+        "*=",
+        field("multiplier", $.term_arg),
+      ),
+
+    multiply_symbolic_term: ($) =>
+      seq(
+        field("multiplicand", $.term_arg),
+        "*",
+        field("multiplier", $.term_arg),
+      ),
+
+    multiply_term: ($) =>
+      makeTerm($.multiply, [
+        ["multiplicand", $.term_arg],
+        ["multiplier", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    mutex_term: ($) =>
+      makeTerm($.mutex, [
+        ["mutex_name", $.name_string],
+        ["sync_level", $.byte_const_expr],
+      ]),
+
+    name_term: ($) =>
+      makeTerm($.name, [
+        ["object_name", $.name_string],
+        ["object", $.data_object],
+      ]),
+
+    n_and_term: ($) =>
+      makeTerm($.n_and, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    no_op_term: ($) => $.no_op,
+
+    n_or_term: ($) =>
+      makeTerm($.n_or, [
+        ["source1", $.term_arg],
+        ["source2", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    notify_term: ($) =>
+      makeTerm($.notify, [
+        ["object", $.super_name],
+        ["notification_value", $.term_arg],
+      ]),
+
+    not_symbolic_term: ($) => seq("~", field("source", $.term_arg)),
+
+    not_term: ($) =>
+      makeTerm($.not, [
+        ["source", $.term_arg],
+        ["result", $.target],
+      ]),
+
+    //TODO: O terms
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
