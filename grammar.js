@@ -4,18 +4,13 @@
  * @license MIT
  */
 
+// NOTE: anything ending in _list must be wrapped in optional() in the parent caller
+
 /**
  * Comma separated list of 1 or more entries
  */
 function commaSep1(rule) {
   return seq(rule, repeat(seq(",", rule)));
-}
-
-/**
- * Comma separated list of 0 or more entries
- */
-function commaSep(rule) {
-  return optional(commaSep1(rule));
 }
 
 function makeTerm(keyword, args = {}, block = null) {
@@ -48,6 +43,16 @@ function makeTerm(keyword, args = {}, block = null) {
 export default grammar({
   name: "asl",
 
+  extras: (_) => [
+    /\s/,
+    /\n/,
+    /\r/,
+    // line comment (//)
+    /\/\/[^\n]*/,
+    // block comment (/* ... */)
+    /\/\*([^*]|\*+[^*/])*\*+\//,
+  ],
+
   inline: ($) => [
     $.word_const,
     $.byte_const,
@@ -59,8 +64,6 @@ export default grammar({
     $.qword_const_expr,
     $.true,
     $.false,
-    $.break_point,
-    $.break,
     $.continue_term,
     $.debug_term,
     $.no_op_term,
@@ -69,7 +72,8 @@ export default grammar({
   ],
 
   rules: {
-    source_file: ($) => "hello",
+    source_file: ($) => optional($.asl_code),
+
     // 19.2.2 ASL Name and Pathname Terms
     _lead_name_char: (_) => /[A-Za-z_]/,
     _digit_char: (_) => /[0-9]/,
@@ -77,7 +81,6 @@ export default grammar({
     _root_char: (_) => "\\",
     _parent_prefix_char: (_) => "^",
     _path_separator_char: (_) => ".",
-    _semicolon_delimiter: (_) => optional(";"),
     name_seg: ($) =>
       seq(
         $._lead_name_char,
@@ -85,18 +88,16 @@ export default grammar({
         optional($._name_char),
         optional($._name_char),
       ),
+    // NOTE: this differs from the spec slightly to avoid empty string matching
     name_string: ($) =>
       choice(
-        seq($._root_char, $.name_path),
-        seq($._parent_prefix_char, $.prefix_path, $.name_path),
-        $.non_empty_name_path,
+        seq($._root_char, optional($.name_path)),
+        seq(repeat1($._parent_prefix_char), optional($.name_path)),
+        $.name_path,
       ),
-    name_path: ($) => optional(seq($.name_seg, $.name_path_trail)),
-    name_path_trail: ($) =>
-      optional(seq($._path_separator_char, $.name_seg, $.name_path_trail)),
-    non_empty_name_path: ($) =>
-      choice($.name_seg, seq($.name_seg, $.name_path_trail)),
-    prefix_path: ($) => optional(seq($._parent_prefix_char, $.prefix_path)),
+    // NOTE: this differs from the spec slightly to avoid empty string matching
+    name_path: ($) =>
+      seq($.name_seg, repeat(seq($._path_separator_char, $.name_seg))),
 
     // 19.2.3 ASL Root and Secondary Terms
     // Root Terms
@@ -116,7 +117,9 @@ export default grammar({
         $.reference_type_opcode,
         $.method_invocation_term,
       ),
-    target: ($) => optional($.super_name),
+    // NOTE: WHEN TARGET IS USED IT MUST BE OPTIONAL
+    // we can't make it optional here since it would violate the empty string match rule
+    target: ($) => $.super_name,
     term_arg: ($) =>
       choice(
         $.expression_opcode,
@@ -127,12 +130,14 @@ export default grammar({
         // WARN: the spec says "SymbolicExpression" but thats never defined so im assuming its this
         $.symbolic_expression_term,
       ),
-    method_invocation_term: ($) => seq($.name_string, "(", $.arg_list, ")"),
+    method_invocation_term: ($) =>
+      seq($.name_string, "(", optional($.arg_list), ")"),
 
     // List Terms
-    arg_list: ($) => commaSep($.term_arg),
-    byte_list: ($) => commaSep($.byte_const_expr),
-    dword_list: ($) => commaSep($.dword_const_expr),
+    // NOTE: these must all be wrapped in optional() in their parents
+    arg_list: ($) => commaSep1($.term_arg),
+    byte_list: ($) => commaSep1($.byte_const_expr),
+    dword_list: ($) => commaSep1($.dword_const_expr),
 
     extended_access_attrib_term: ($) =>
       seq(
@@ -142,7 +147,8 @@ export default grammar({
         ")",
       ),
 
-    field_unit_list: ($) => commaSep($.field_unit),
+    //NOTE: this must be wrapped in optional() in the parent
+    field_unit_list: ($) => commaSep1($.field_unit),
     field_unit: ($) =>
       choice(
         $.field_unit_entry,
@@ -152,7 +158,8 @@ export default grammar({
       ),
     field_unit_entry: ($) => seq(optional($.name_seg), ",", $.integer),
 
-    package_list: ($) => commaSep($.package_element),
+    // NOTE: this must be wrapped in optional() in the parent
+    package_list: ($) => commaSep1($.package_element),
     package_element: ($) => choice($.data_object, $.name_string),
 
     parameter_type_package: ($) =>
@@ -168,7 +175,8 @@ export default grammar({
         seq("{", optional($.parameter_types_package_list), "}"),
       ),
     parameter_types_package_list: ($) => commaSep1($.parameter_type_package),
-    term_list: ($) => repeat(seq($.term, optional($._semicolon_delimiter))),
+    // NOTE: this must be marked optional() in the parent
+    term_list: ($) => repeat1(seq($.term, optional(";"))),
     term: ($) =>
       choice(
         $.object,
@@ -181,14 +189,9 @@ export default grammar({
       choice($.compiler_directive, $.named_object, $.name_space_modifier),
 
     // Conditional Execution List Terms
-    case_term_list: ($) =>
-      seq(
-        // Nothing | CaseTerm | CaseTerm CaseTermList
-        repeat($.case_term),
-        // DefaultTerm DefaultTermList
-        optional(seq($.default_term, $.default_term_list)),
-      ),
-    default_term_list: ($) => repeat($.case_term),
+    // NOTE: this differs from the spec slightly to avoid empty string matches
+    // NOTE: this must be marked optional() in the parent
+    case_term_list: ($) => repeat1(choice($.case_term, $.default_term)),
     if_else_term: ($) => seq($.if_term, $.else_term),
 
     // 19.2.4 ASL Data and Constant Terms
@@ -233,9 +236,9 @@ export default grammar({
     const_expr_term: ($) => choice($.zero, $.one, $.ones),
 
     // String Terms
-    string: ($) => seq('"', $._utf8_char_list, '"'),
-    _utf8_char_list: ($) => repeat(choice($._escape_sequence, $._utf8_char)),
-    _utf8_char: (_) => /[^"\\\0]+/,
+    string: ($) => seq('"', optional($._utf8_char_list), '"'),
+    _utf8_char_list: ($) => repeat1(choice($._escape_sequence, $._utf8_char)),
+    _utf8_char: (_) => /[^"\\\x00]+/,
 
     // Eescape sequences
     _escape_sequence: ($) =>
@@ -534,7 +537,7 @@ export default grammar({
       makeTerm($.add, {
         addend1: $.term_arg,
         addend2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     alias_term: ($) =>
@@ -557,7 +560,7 @@ export default grammar({
       makeTerm($.and, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     arg_term: (_) => /Arg[0-6]/i,
@@ -573,7 +576,7 @@ export default grammar({
           lock_rule: $.lock_rule_keyword,
           update_rule: $.update_rule_keyword,
         },
-        { field_unit_list: $.field_unit_list },
+        { field_unit_list: optional($.field_unit_list) },
       ),
 
     break_point_term: ($) => $.break_point,
@@ -583,24 +586,27 @@ export default grammar({
       makeTerm(
         $.buffer,
         { buff_size: optional($.term_arg) },
-        { block: choice($.string_data, $.byte_list) },
+        { block: choice($.string_data, optional($.byte_list)) },
       ),
 
     case_term: ($) =>
-      makeTerm($.case, { value: $.data_object, term_list: $.term_list }),
+      makeTerm($.case, {
+        value: $.data_object,
+        term_list: optional($.term_list),
+      }),
 
     concat_res_term: ($) =>
       makeTerm($.concatenate_res_template, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     concat_term: ($) =>
       makeTerm($.concatenate, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     connection_term: ($) =>
@@ -619,7 +625,7 @@ export default grammar({
             $.deref_of_term,
           ),
         },
-        { destination: $.target },
+        { destination: optional($.target) },
       ),
 
     continue_term: ($) => $.continue,
@@ -682,7 +688,7 @@ export default grammar({
 
     dec_term: ($) => makeTerm($.decrement, { minuend: $.super_name }),
 
-    default_term: ($) => seq($.default, "{", $.term_list, "}"),
+    default_term: ($) => seq($.default, "{", optional($.term_list), "}"),
 
     definition_block_term: ($) =>
       makeTerm(
@@ -695,7 +701,7 @@ export default grammar({
           table_id: $.string,
           oem_revision: $.dword_const,
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     _deref_of_source: ($) =>
@@ -714,7 +720,7 @@ export default grammar({
       makeTerm(
         $.device,
         { device_name: $.name_string },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     divide_compound_term: ($) =>
@@ -731,8 +737,8 @@ export default grammar({
       makeTerm($.divide, {
         dividend: $.term_arg,
         divisor: $.term_arg,
-        remainder: $.target,
-        result: $.target,
+        remainder: optional($.target),
+        result: optional($.target),
       }),
 
     eisa_id_term: ($) => makeTerm($.eisa_id, { eisa_id_string: $.string_data }),
@@ -744,14 +750,15 @@ export default grammar({
         makeTerm(
           $.else_if,
           { predicate: $.term_arg },
-          { term_list: $.term_list },
+          { term_list: optional($.term_list) },
         ),
         optional($._else_else_if),
       ),
 
     // WARN: this deviates from the spec a little because ebnf is weird
     // NOTE: optionality should be handled in the parent rule
-    else_term: ($) => seq($.else, "{", field("term_list", $.term_list), "}"),
+    else_term: ($) =>
+      seq($.else, "{", field("term_list", optional($.term_list)), "}"),
 
     event_term: ($) => makeTerm($.event, { event_name: $.name_string }),
 
@@ -779,18 +786,18 @@ export default grammar({
           lock_rule: $.lock_rule_keyword,
           update_rule: $.update_rule_keyword,
         },
-        { field_unit_list: $.field_unit_list },
+        { field_unit_list: optional($.field_unit_list) },
       ),
 
     find_set_left_bit_term: ($) =>
       makeTerm($.find_set_left_bit, {
         source: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
     find_set_right_bit_term: ($) =>
       makeTerm($.find_set_right_bit, {
         source: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     for_term: ($) =>
@@ -801,7 +808,7 @@ export default grammar({
           predicate: optional($.term_arg),
           update: optional($.term_arg),
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     fprintf_term: ($) =>
@@ -814,7 +821,7 @@ export default grammar({
     from_bcd_term: ($) =>
       makeTerm($.from_bcd, {
         bcd_value: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     function_term: ($) =>
@@ -825,11 +832,15 @@ export default grammar({
           return_type: optional($.parameter_type_package),
           parameter_types: optional($.parameter_types_package),
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     if_term: ($) =>
-      makeTerm($.if, { predicate: $.term_arg }, { term_list: $.term_list }),
+      makeTerm(
+        $.if,
+        { predicate: $.term_arg },
+        { term_list: optional($.term_list) },
+      ),
 
     include_term: ($) => makeTerm($.include, { file_path_name: $.string_data }),
 
@@ -847,7 +858,7 @@ export default grammar({
           lock_rule: $.lock_rule_keyword,
           update_rule: $.update_rule_keyword,
         },
-        { field_unit_list: $.field_unit_list },
+        { field_unit_list: optional($.field_unit_list) },
       ),
 
     index_symbolic_term: ($) =>
@@ -857,7 +868,7 @@ export default grammar({
       makeTerm($.index, {
         source: $.term_arg,
         index: $.term_arg,
-        destination: $.target,
+        destination: optional($.target),
       }),
 
     l_and_symbolic_term: ($) =>
@@ -975,7 +986,7 @@ export default grammar({
           return_type: optional($.parameter_type_package),
           parameter_types: optional($.parameter_types_package),
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     mid_term: ($) =>
@@ -983,7 +994,7 @@ export default grammar({
         source: $.term_arg,
         index: $.term_arg,
         length: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     mod_compound_term: ($) =>
@@ -1000,7 +1011,7 @@ export default grammar({
       makeTerm($.mod, {
         dividend: $.term_arg,
         divisor: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     multiply_compound_term: ($) =>
@@ -1021,7 +1032,7 @@ export default grammar({
       makeTerm($.multiply, {
         multiplicand: $.term_arg,
         multiplier: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     mutex_term: ($) =>
@@ -1040,7 +1051,7 @@ export default grammar({
       makeTerm($.n_and, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     no_op_term: ($) => $.no_op,
@@ -1049,7 +1060,7 @@ export default grammar({
       makeTerm($.n_or, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     notify_term: ($) =>
@@ -1063,7 +1074,7 @@ export default grammar({
     not_term: ($) =>
       makeTerm($.not, {
         source: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     object_type_term: ($) =>
@@ -1103,14 +1114,14 @@ export default grammar({
       makeTerm($.or, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     package_term: ($) =>
       makeTerm(
         $.package,
         { num_elements: optional(choice($.byte_const_expr, $.term_arg)) },
-        { package_list: $.package_list },
+        { package_list: optional($.package_list) },
       ),
 
     pld_keyword: (_) =>
@@ -1157,7 +1168,7 @@ export default grammar({
           system_level: $.byte_const_expr,
           resource_order: $.word_const_expr,
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     printf_arg_list: ($) => seq($.term_arg, repeat(seq(",", $.term_arg))),
@@ -1177,14 +1188,14 @@ export default grammar({
           pblock_address: optional($.dword_const_expr),
           pblock_length: optional($.byte_const_expr),
         },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     raw_data_buffer_term: ($) =>
       makeTerm(
         $.raw_data_buffer,
         { buff_size: optional($.word_const) },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     ref_of_term: ($) =>
@@ -1207,7 +1218,7 @@ export default grammar({
       makeTerm(
         $.scope,
         { location: $.name_string },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     shift_left_compound_term: ($) =>
@@ -1224,7 +1235,7 @@ export default grammar({
       makeTerm($.shift_left, {
         source: $.term_arg,
         shift_count: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     shift_right_compound_term: ($) =>
@@ -1241,7 +1252,7 @@ export default grammar({
       makeTerm($.shift_right, {
         source: $.term_arg,
         shift_count: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     signal_term: ($) => makeTerm($.signal, { sync_object: $.super_name }),
@@ -1272,39 +1283,45 @@ export default grammar({
       makeTerm($.subtract, {
         minuend: $.term_arg,
         subtrahend: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     switch_term: ($) =>
       makeTerm(
         $.switch,
         { predicate: $.term_arg },
-        { case_term_list: $.case_term_list },
+        { case_term_list: optional($.case_term_list) },
       ),
 
     thermal_zone_term: ($) =>
       makeTerm(
         $.thermal_zone,
         { thermal_zone_name: $.name_string },
-        { term_list: $.term_list },
+        { term_list: optional($.term_list) },
       ),
 
     timer_term: ($) => $.timer,
 
     to_bcd_term: ($) =>
-      makeTerm($.to_bcd, { value: $.term_arg, result: $.target }),
+      makeTerm($.to_bcd, { value: $.term_arg, result: optional($.target) }),
 
     to_buffer_term: ($) =>
-      makeTerm($.to_buffer, { data: $.term_arg, result: $.target }),
+      makeTerm($.to_buffer, { data: $.term_arg, result: optional($.target) }),
 
     to_decimal_string_term: ($) =>
-      makeTerm($.to_decimal_string, { data: $.term_arg, result: $.target }),
+      makeTerm($.to_decimal_string, {
+        data: $.term_arg,
+        result: optional($.target),
+      }),
 
     to_hex_string_term: ($) =>
-      makeTerm($.to_hex_string, { data: $.term_arg, result: $.target }),
+      makeTerm($.to_hex_string, {
+        data: $.term_arg,
+        result: optional($.target),
+      }),
 
     to_integer_term: ($) =>
-      makeTerm($.to_integer, { data: $.term_arg, result: $.target }),
+      makeTerm($.to_integer, { data: $.term_arg, result: optional($.target) }),
 
     to_pld_term: ($) =>
       makeTerm($.to_pld, { pld_keyword_list: optional($.pld_keyword_list) }),
@@ -1313,7 +1330,7 @@ export default grammar({
       makeTerm($.to_string, {
         source: $.term_arg,
         length: optional($.term_arg),
-        result: $.target,
+        result: optional($.target),
       }),
 
     to_uuid_term: ($) => makeTerm($.to_uuid, { string: $.string_data }),
@@ -1329,7 +1346,11 @@ export default grammar({
       }),
 
     while_term: ($) =>
-      makeTerm($.while, { predicate: $.term_arg }, { term_list: $.term_list }),
+      makeTerm(
+        $.while,
+        { predicate: $.term_arg },
+        { term_list: optional($.term_list) },
+      ),
 
     xor_compound_term: ($) =>
       seq(
@@ -1345,7 +1366,7 @@ export default grammar({
       makeTerm($.xor, {
         source1: $.term_arg,
         source2: $.term_arg,
-        result: $.target,
+        result: optional($.target),
       }),
 
     // 19.2.7 ASL Parameter Keyword Terms
@@ -1512,7 +1533,8 @@ export default grammar({
 
     // 19.2.8 ASL Resource Template Terms
     // NOTE: this was also parsed from a web scraping. i went over it to fix obvious bugs but there may be some remaining
-    resource_macro_list: ($) => repeat(seq($.resource_macro_term)),
+    // NOTE: this must be marked optional() in the parent
+    resource_macro_list: ($) => repeat1(seq($.resource_macro_term)),
     resource_macro_term: ($) =>
       choice(
         $.dma_term,
@@ -1564,7 +1586,7 @@ export default grammar({
           xfer_type: $.xfer_type_keyword,
           descriptor_name: optional($.name_string),
         },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     dword_io_term: ($) =>
@@ -1710,7 +1732,7 @@ export default grammar({
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     gpio_io_term: ($) =>
@@ -1728,7 +1750,7 @@ export default grammar({
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     i2c_serial_bus_term: ($) =>
@@ -1758,7 +1780,7 @@ export default grammar({
           resource_source: optional($.string_data),
           descriptor_name: optional($.name_string),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     io_term: ($) =>
@@ -1777,7 +1799,7 @@ export default grammar({
         {
           descriptor_name: optional($.name_string),
         },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     irq_term: ($) =>
@@ -1789,7 +1811,7 @@ export default grammar({
           share_type: optional($.share_type_keyword),
           descriptor_name: optional($.name_string),
         },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     memory24_term: ($) =>
@@ -1836,7 +1858,7 @@ export default grammar({
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     pin_function_term: ($) =>
@@ -1853,7 +1875,7 @@ export default grammar({
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     pin_group_term: ($) =>
@@ -1865,7 +1887,7 @@ export default grammar({
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
         },
-        { dword_list: $.dword_list },
+        { dword_list: optional($.dword_list) },
       ),
 
     pin_group_config_term: ($) =>
@@ -1985,7 +2007,7 @@ export default grammar({
       makeTerm(
         $.start_dependent_fn_no_pri,
         {},
-        { resource_macro_list: $.resource_macro_list },
+        { resource_macro_list: optional($.resource_macro_list) },
       ),
 
     start_dependent_fn_term: ($) =>
@@ -1995,7 +2017,7 @@ export default grammar({
           compat_priority: $.byte_const_expr,
           perf_robust_priority: $.byte_const_expr,
         },
-        { resource_macro_list: $.resource_macro_list },
+        { resource_macro_list: optional($.resource_macro_list) },
       ),
 
     uart_serial_bus_term: ($) =>
@@ -2023,7 +2045,7 @@ export default grammar({
         {
           descriptor_name: optional($.name_string),
         },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     vendor_short_term: ($) =>
@@ -2032,7 +2054,7 @@ export default grammar({
         {
           descriptor_name: optional($.name_string),
         },
-        { byte_list: $.byte_list },
+        { byte_list: optional($.byte_list) },
       ),
 
     word_bus_number_term: ($) =>
