@@ -58,10 +58,6 @@ export default grammar({
     $.byte_const,
     $.dword_const,
     $.qword_const,
-    $.byte_const_expr,
-    $.word_const_expr,
-    $.dword_const_expr,
-    $.qword_const_expr,
     $.true,
     $.false,
     $.continue_term,
@@ -136,8 +132,8 @@ export default grammar({
     // List Terms
     // NOTE: these must all be wrapped in optional() in their parents
     arg_list: ($) => commaSep1($.term_arg),
-    byte_list: ($) => commaSep1($.byte_const_expr),
-    dword_list: ($) => commaSep1($.dword_const_expr),
+    byte_list: ($) => commaSep1($._byte_const_expr),
+    dword_list: ($) => commaSep1($._dword_const_expr),
 
     extended_access_attrib_term: ($) =>
       seq(
@@ -223,13 +219,13 @@ export default grammar({
     dword_const: ($) => $.integer,
     qword_const: ($) => $.integer,
 
-    byte_const_expr: ($) =>
+    _byte_const_expr: ($) =>
       choice($.integer_type_opcode, $.const_expr_term, $.integer),
-    word_const_expr: ($) =>
+    _word_const_expr: ($) =>
       choice($.integer_type_opcode, $.const_expr_term, $.integer),
-    dword_const_expr: ($) =>
+    _dword_const_expr: ($) =>
       choice($.integer_type_opcode, $.const_expr_term, $.integer),
-    qword_const_expr: ($) =>
+    _qword_const_expr: ($) =>
       choice($.integer_type_opcode, $.const_expr_term, $.integer),
 
     const_term: ($) => choice($.const_expr_term, $.revision),
@@ -504,7 +500,7 @@ export default grammar({
     // 19.2.6 ASL Primary (Terminal) Terms
     _access_attribute: ($) =>
       choice(
-        $.byte_const_expr,
+        $._byte_const_expr,
         $.access_attrib_keyword,
         $.extended_access_attrib_term,
       ),
@@ -520,7 +516,7 @@ export default grammar({
     acquire_term: ($) =>
       makeTerm($.acquire, {
         sync_object: $.super_name,
-        timeout_value: $.word_const_expr,
+        timeout_value: $._word_const_expr,
       }),
 
     add_compound_term: ($) =>
@@ -772,8 +768,8 @@ export default grammar({
 
     fatal_term: ($) =>
       makeTerm($.fatal, {
-        type: $.byte_const_expr,
-        code: $.dword_const_expr,
+        type: $._byte_const_expr,
+        code: $._dword_const_expr,
         arg: $.term_arg,
       }),
 
@@ -980,9 +976,9 @@ export default grammar({
         $.method,
         {
           method_name: $.name_string,
-          num_args: optional($.byte_const_expr),
+          num_args: optional($._byte_const_expr),
           serialize_rule: optional($.serialize_rule_keyword),
-          sync_level: optional($.byte_const_expr),
+          sync_level: optional($._byte_const_expr),
           return_type: optional($.parameter_type_package),
           parameter_types: optional($.parameter_types_package),
         },
@@ -1038,7 +1034,7 @@ export default grammar({
     mutex_term: ($) =>
       makeTerm($.mutex, {
         mutex_name: $.name_string,
-        sync_level: $.byte_const_expr,
+        sync_level: $._byte_const_expr,
       }),
 
     name_term: ($) =>
@@ -1120,7 +1116,7 @@ export default grammar({
     package_term: ($) =>
       makeTerm(
         $.package,
-        { num_elements: optional(choice($.byte_const_expr, $.term_arg)) },
+        { num_elements: optional(choice($._byte_const_expr, $.term_arg)) },
         { package_list: optional($.package_list) },
       ),
 
@@ -1165,8 +1161,8 @@ export default grammar({
         $.power_resource,
         {
           resource_name: $.name_string,
-          system_level: $.byte_const_expr,
-          resource_order: $.word_const_expr,
+          system_level: $._byte_const_expr,
+          resource_order: $._word_const_expr,
         },
         { term_list: optional($.term_list) },
       ),
@@ -1184,9 +1180,9 @@ export default grammar({
         $.processor,
         {
           processor_name: $.name_string,
-          processor_id: $.byte_const_expr,
-          pblock_address: optional($.dword_const_expr),
-          pblock_length: optional($.byte_const_expr),
+          processor_id: $._byte_const_expr,
+          pblock_address: optional($._dword_const_expr),
+          pblock_length: optional($._byte_const_expr),
         },
         { term_list: optional($.term_list) },
       ),
@@ -1371,11 +1367,11 @@ export default grammar({
 
     // 19.2.7 ASL Parameter Keyword Terms
     // Most of this was generated from a web scraping of uefi.org that i did
-    attrib_bytes: ($) => makeTerm(/AttribBytes/i, { n: $.byte_const_expr }),
+    attrib_bytes: ($) => makeTerm(/AttribBytes/i, { n: $._byte_const_expr }),
     attrib_raw_bytes: ($) =>
-      makeTerm(/AttribRawBytes/i, { n: $.byte_const_expr }),
+      makeTerm(/AttribRawBytes/i, { n: $._byte_const_expr }),
     attrib_raw_process_bytes: ($) =>
-      makeTerm(/AttribRawProcessBytes/i, { n: $.byte_const_expr }),
+      makeTerm(/AttribRawProcessBytes/i, { n: $._byte_const_expr }),
     access_attrib_keyword: ($) =>
       choice(
         /AttribQuick/i,
@@ -1596,12 +1592,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         decode: optional($.decode_keyword),
         range_type: optional($.range_type_keyword),
-        address_granularity: $.dword_const_expr,
-        min_address: $.dword_const_expr,
-        max_address: $.dword_const_expr,
-        address_translation: $.dword_const_expr,
-        address_length: $.dword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._dword_const_expr,
+        min_address: $._dword_const_expr,
+        max_address: $._dword_const_expr,
+        address_translation: $._dword_const_expr,
+        address_length: $._dword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
         translation_type: optional($.type_keyword),
@@ -1616,12 +1612,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         mem_type: optional($.mem_type_keyword),
         read_write_type: $.read_write_keyword,
-        address_granularity: $.dword_const_expr,
-        min_address: $.dword_const_expr,
-        max_address: $.dword_const_expr,
-        address_translation: $.dword_const_expr,
-        address_length: $.dword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._dword_const_expr,
+        min_address: $._dword_const_expr,
+        max_address: $._dword_const_expr,
+        address_translation: $._dword_const_expr,
+        address_length: $._dword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
         memory_range_type: optional($.address_keyword),
@@ -1630,18 +1626,18 @@ export default grammar({
 
     dword_space_term: ($) =>
       makeTerm($.dword_space, {
-        resource_type: $.byte_const_expr,
+        resource_type: $._byte_const_expr,
         resource_usage: optional($.resource_type_keyword),
         decode: optional($.decode_keyword),
         min_type: optional($.min_keyword),
         max_type: optional($.max_keyword),
-        type_specific_flags: $.byte_const_expr,
-        address_granularity: $.dword_const_expr,
-        min_address: $.dword_const_expr,
-        max_address: $.dword_const_expr,
-        address_translation: $.dword_const_expr,
-        address_length: $.dword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        type_specific_flags: $._byte_const_expr,
+        address_granularity: $._dword_const_expr,
+        min_address: $._dword_const_expr,
+        max_address: $._dword_const_expr,
+        address_translation: $._dword_const_expr,
+        address_length: $._dword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
       }),
@@ -1655,12 +1651,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         decode: optional($.decode_keyword),
         range_type: optional($.range_type_keyword),
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        type_specific_attributes: optional($.qword_const_expr),
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        type_specific_attributes: optional($._qword_const_expr),
         descriptor_name: optional($.name_string),
         translation_type: optional($.type_keyword),
         translation_density: optional($.translation_keyword),
@@ -1674,12 +1670,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         mem_type: optional($.mem_type_keyword),
         read_write_type: $.read_write_keyword,
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        type_specific_attributes: optional($.qword_const_expr),
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        type_specific_attributes: optional($._qword_const_expr),
         descriptor_name: optional($.name_string),
         memory_range_type: optional($.address_keyword),
         translation_type: optional($.type_keyword),
@@ -1687,33 +1683,33 @@ export default grammar({
 
     extended_space_term: ($) =>
       makeTerm($.extended_space, {
-        resource_type: $.byte_const_expr,
+        resource_type: $._byte_const_expr,
         resource_usage: optional($.resource_type_keyword),
         decode: optional($.decode_keyword),
         min_type: optional($.min_keyword),
         max_type: optional($.max_keyword),
-        type_specific_flags: $.byte_const_expr,
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        type_specific_attributes: optional($.qword_const_expr),
+        type_specific_flags: $._byte_const_expr,
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        type_specific_attributes: optional($._qword_const_expr),
         descriptor_name: optional($.name_string),
       }),
 
     fixed_dma_term: ($) =>
       makeTerm($.fixed_dma, {
-        dma_req: $.word_const_expr,
-        channel: $.word_const_expr,
+        dma_req: $._word_const_expr,
+        channel: $._word_const_expr,
         xfer_width: optional($.transfer_width_keyword),
         descriptor_name: optional($.name_string),
       }),
 
     fixed_io_term: ($) =>
       makeTerm($.fixed_io, {
-        address_base: $.word_const_expr,
-        range_length: $.byte_const_expr,
+        address_base: $._word_const_expr,
+        range_length: $._byte_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
@@ -1724,10 +1720,10 @@ export default grammar({
           interrupt_type: $.interrupt_type_keyword,
           interrupt_level: $.interrupt_level_keyword,
           share_type: optional($.share_type_keyword),
-          pin_config: choice($.pin_config_keyword, $.byte_const_expr),
-          de_bounce_time: optional($.word_const_expr),
+          pin_config: choice($.pin_config_keyword, $._byte_const_expr),
+          de_bounce_time: optional($._word_const_expr),
           resource_source: $.string_data,
-          resource_source_index: optional($.byte_const_expr),
+          resource_source_index: optional($._byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
@@ -1740,12 +1736,12 @@ export default grammar({
         $.gpio_io,
         {
           share_type: optional($.share_type_keyword),
-          pin_config: choice($.pin_config_keyword, $.byte_const_expr),
-          de_bounce_time: optional($.word_const_expr),
-          drive_strength: optional($.word_const_expr),
+          pin_config: choice($.pin_config_keyword, $._byte_const_expr),
+          de_bounce_time: optional($._word_const_expr),
+          drive_strength: optional($._word_const_expr),
           io_restriction: optional($.io_restriction_keyword),
           resource_source: $.string_data,
-          resource_source_index: optional($.byte_const_expr),
+          resource_source_index: optional($._byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
@@ -1755,13 +1751,13 @@ export default grammar({
 
     i2c_serial_bus_term: ($) =>
       makeTerm($.i2c_serial_bus_v2, {
-        slave_address: $.word_const_expr,
+        slave_address: $._word_const_expr,
         slave_mode: optional($.slave_mode_keyword),
-        connection_speed: $.dword_const_expr,
+        connection_speed: $._dword_const_expr,
         // WARN: the spec says "AddressModeKeyword" but i think thats a typo
         addressing_mode: optional($.addressing_mode_keyword),
         resource_source: $.string_data,
-        resource_source_index: optional($.byte_const_expr),
+        resource_source_index: optional($._byte_const_expr),
         resource_usage: optional($.resource_type_keyword),
         descriptor_name: optional($.name_string),
         share_type: optional($.share_type_keyword),
@@ -1776,7 +1772,7 @@ export default grammar({
           interrupt_type: $.interrupt_type_keyword,
           interrupt_level: $.interrupt_level_keyword,
           share_type: optional($.share_type_keyword),
-          resource_source_index: optional($.byte_const_expr),
+          resource_source_index: optional($._byte_const_expr),
           resource_source: optional($.string_data),
           descriptor_name: optional($.name_string),
         },
@@ -1786,10 +1782,10 @@ export default grammar({
     io_term: ($) =>
       makeTerm($.io, {
         io_decode: $.io_decode_keyword,
-        min_address: $.word_const_expr,
-        max_address: $.word_const_expr,
-        alignment: $.byte_const_expr,
-        range_length: $.byte_const_expr,
+        min_address: $._word_const_expr,
+        max_address: $._word_const_expr,
+        alignment: $._byte_const_expr,
+        range_length: $._byte_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
@@ -1818,28 +1814,28 @@ export default grammar({
       makeTerm($.memory24, {
         read_write_type: $.read_write_keyword,
         // NOTE: spec says [23:8] which im ignoring
-        min_address: $.word_const_expr,
-        max_address: $.word_const_expr,
-        alignment: $.word_const_expr,
-        range_length: $.word_const_expr,
+        min_address: $._word_const_expr,
+        max_address: $._word_const_expr,
+        alignment: $._word_const_expr,
+        range_length: $._word_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
     memory32_fixed_term: ($) =>
       makeTerm($.memory32_fixed, {
         read_write_type: $.read_write_keyword,
-        address_base: $.dword_const_expr,
-        range_length: $.dword_const_expr,
+        address_base: $._dword_const_expr,
+        range_length: $._dword_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
     memory32_term: ($) =>
       makeTerm($.memory32, {
         read_write_type: $.read_write_keyword,
-        min_address: $.dword_const_expr,
-        max_address: $.dword_const_expr,
-        alignment: $.dword_const_expr,
-        range_length: $.dword_const_expr,
+        min_address: $._dword_const_expr,
+        max_address: $._dword_const_expr,
+        alignment: $._dword_const_expr,
+        range_length: $._dword_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
@@ -1849,11 +1845,11 @@ export default grammar({
         {
           share_type: optional($.share_type_keyword),
           // NOTE: the spec shows this field as ByteData but i think thats a mistake
-          pin_config_type: $.byte_const_expr,
+          pin_config_type: $._byte_const_expr,
           // NOTE: the spec shows this field as ByteData but i think thats a mistake
-          pin_config_value: $.byte_const_expr,
+          pin_config_value: $._byte_const_expr,
           resource_source: $.string_data,
-          resource_source_index: optional($.byte_const_expr),
+          resource_source_index: optional($._byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
@@ -1868,9 +1864,9 @@ export default grammar({
           share_type: optional($.share_type_keyword),
           pin_pull_configuration: $.pin_config_keyword,
           // NOTE: the spec shows this field as WordData but i think thats a mistake
-          function_number: $.word_const_expr,
+          function_number: $._word_const_expr,
           resource_source: $.string_data,
-          resource_source_index: optional($.byte_const_expr),
+          resource_source_index: optional($._byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
           descriptor_name: optional($.name_string),
           vendor_data: optional($.raw_data_buffer),
@@ -1894,11 +1890,11 @@ export default grammar({
       makeTerm($.pin_group_config, {
         share_type: optional($.share_type_keyword),
         // NOTE: the spec shows this field as ByteData but i think thats a mistake
-        pin_config_type: $.byte_const_expr,
+        pin_config_type: $._byte_const_expr,
         // NOTE: the spec shows this field as ByteData but i think thats a mistake
-        pin_config_value: $.byte_const_expr,
+        pin_config_value: $._byte_const_expr,
         resource_source: $.string_data,
-        resource_source_index: optional($.byte_const_expr),
+        resource_source_index: optional($._byte_const_expr),
         resource_source_label: $.string_data,
         resource_usage: optional($.resource_type_keyword),
         descriptor_name: optional($.name_string),
@@ -1909,9 +1905,9 @@ export default grammar({
       makeTerm($.pin_group_function, {
         share_type: optional($.share_type_keyword),
         // NOTE: the spec shows this field as WordData but i think thats a mistake
-        function_number: $.word_const_expr,
+        function_number: $._word_const_expr,
         resource_source: $.string_data,
-        resource_source_index: optional($.byte_const_expr),
+        resource_source_index: optional($._byte_const_expr),
         resource_source_label: $.string_data,
         resource_usage: optional($.resource_type_keyword),
         descriptor_name: optional($.name_string),
@@ -1925,12 +1921,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         decode: optional($.decode_keyword),
         range_type: optional($.range_type_keyword),
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
         translation_type: optional($.type_keyword),
@@ -1945,12 +1941,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         mem_type: optional($.mem_type_keyword),
         read_write_type: $.read_write_keyword,
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
         memory_range_type: optional($.address_keyword),
@@ -1959,18 +1955,18 @@ export default grammar({
 
     qword_space_term: ($) =>
       makeTerm($.qword_space, {
-        resource_type: $.byte_const_expr,
+        resource_type: $._byte_const_expr,
         resource_usage: optional($.resource_type_keyword),
         decode: optional($.decode_keyword),
         min_type: optional($.min_keyword),
         max_type: optional($.max_keyword),
-        type_specific_flags: $.byte_const_expr,
-        address_granularity: $.qword_const_expr,
-        min_address: $.qword_const_expr,
-        max_address: $.qword_const_expr,
-        address_translation: $.qword_const_expr,
-        address_length: $.qword_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        type_specific_flags: $._byte_const_expr,
+        address_granularity: $._qword_const_expr,
+        min_address: $._qword_const_expr,
+        max_address: $._qword_const_expr,
+        address_translation: $._qword_const_expr,
+        address_length: $._qword_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
       }),
@@ -1978,25 +1974,25 @@ export default grammar({
     register_term: ($) =>
       makeTerm($.register, {
         address_space_id: $.address_space_keyword,
-        register_bit_width: $.byte_const_expr,
-        register_offset: $.byte_const_expr,
-        register_address: $.qword_const_expr,
-        access_size: $.byte_const_expr,
+        register_bit_width: $._byte_const_expr,
+        register_offset: $._byte_const_expr,
+        register_address: $._qword_const_expr,
+        access_size: $._byte_const_expr,
         descriptor_name: optional($.name_string),
       }),
 
     spi_serial_bus_term: ($) =>
       makeTerm($.spi_serial_bus_v2, {
-        device_selection: $.word_const_expr,
+        device_selection: $._word_const_expr,
         device_selection_polarity: optional($.device_polarity_keyword),
         wire_mode: optional($.wire_mode_keyword),
-        data_bit_length: $.byte_const_expr,
+        data_bit_length: $._byte_const_expr,
         slave_mode: optional($.slave_mode_keyword),
-        connection_speed: $.dword_const_expr,
+        connection_speed: $._dword_const_expr,
         clock_polarity: $.clock_polarity_keyword,
         clock_phase: $.clock_phase_keyword,
         resource_source: $.string_data,
-        resource_source_index: optional($.byte_const_expr),
+        resource_source_index: optional($._byte_const_expr),
         resource_usage: optional($.resource_type_keyword),
         descriptor_name: optional($.name_string),
         share_type: optional($.share_type_keyword),
@@ -2014,25 +2010,25 @@ export default grammar({
       makeTerm(
         $.start_dependent_fn,
         {
-          compat_priority: $.byte_const_expr,
-          perf_robust_priority: $.byte_const_expr,
+          compat_priority: $._byte_const_expr,
+          perf_robust_priority: $._byte_const_expr,
         },
         { resource_macro_list: optional($.resource_macro_list) },
       ),
 
     uart_serial_bus_term: ($) =>
       makeTerm($.uart_serial_bus_v2, {
-        initial_baudrate: $.dword_const_expr,
+        initial_baudrate: $._dword_const_expr,
         bits_per_byte: optional($.data_bits_keyword),
         stop_bits: optional($.stop_bits_keyword),
-        lines_in_use: $.byte_const_expr,
+        lines_in_use: $._byte_const_expr,
         is_big_endian: optional($.endianess_keyword),
         parity: optional($.parity_type_keyword),
         flow_control: optional($.flow_control_keyword),
-        receive_buffer_size: $.word_const_expr,
-        transmit_buffer_size: $.word_const_expr,
+        receive_buffer_size: $._word_const_expr,
+        transmit_buffer_size: $._word_const_expr,
         resource_source: $.string_data,
-        resource_source_index: optional($.byte_const_expr),
+        resource_source_index: optional($._byte_const_expr),
         resource_usage: optional($.resource_type_keyword),
         descriptor_name: optional($.name_string),
         share_type: optional($.share_type_keyword),
@@ -2063,12 +2059,12 @@ export default grammar({
         min_type: optional($.min_keyword),
         max_type: optional($.max_keyword),
         decode: optional($.decode_keyword),
-        address_granularity: $.word_const_expr,
-        min_address: $.word_const_expr,
-        max_address: $.word_const_expr,
-        address_translation: $.word_const_expr,
-        address_length: $.word_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._word_const_expr,
+        min_address: $._word_const_expr,
+        max_address: $._word_const_expr,
+        address_translation: $._word_const_expr,
+        address_length: $._word_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
       }),
@@ -2080,12 +2076,12 @@ export default grammar({
         max_type: optional($.max_keyword),
         decode: optional($.decode_keyword),
         range_type: optional($.range_type_keyword),
-        address_granularity: $.word_const_expr,
-        min_address: $.word_const_expr,
-        max_address: $.word_const_expr,
-        address_translation: $.word_const_expr,
-        address_length: $.word_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        address_granularity: $._word_const_expr,
+        min_address: $._word_const_expr,
+        max_address: $._word_const_expr,
+        address_translation: $._word_const_expr,
+        address_length: $._word_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
         translation_type: optional($.type_keyword),
@@ -2094,18 +2090,18 @@ export default grammar({
 
     word_space_term: ($) =>
       makeTerm($.word_space, {
-        resource_type: $.byte_const_expr,
+        resource_type: $._byte_const_expr,
         resource_usage: optional($.resource_type_keyword),
         decode: optional($.decode_keyword),
         min_type: optional($.min_keyword),
         max_type: optional($.max_keyword),
-        type_specific_flags: $.byte_const_expr,
-        address_granularity: $.word_const_expr,
-        min_address: $.word_const_expr,
-        max_address: $.word_const_expr,
-        address_translation: $.word_const_expr,
-        address_length: $.word_const_expr,
-        resource_source_index: optional($.byte_const_expr),
+        type_specific_flags: $._byte_const_expr,
+        address_granularity: $._word_const_expr,
+        min_address: $._word_const_expr,
+        max_address: $._word_const_expr,
+        address_translation: $._word_const_expr,
+        address_length: $._word_const_expr,
+        resource_source_index: optional($._byte_const_expr),
         resource_source: optional($.string_data),
         descriptor_name: optional($.name_string),
       }),
