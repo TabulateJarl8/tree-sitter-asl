@@ -4,15 +4,26 @@
  * @license MIT
  */
 
+/// <reference types="tree-sitter-cli/dsl" />
+// @ts-check
+
 // NOTE: anything ending in _list must be wrapped in optional() in the parent caller
 
 /**
  * Comma separated list of 1 or more entries
+ * @param {Rule} rule
  */
 function commaSep1(rule) {
   return seq(rule, repeat(seq(",", rule)));
 }
 
+/**
+ *
+ * @param {Rule} keyword
+ * @param {Record<string, Rule>} args
+ * @param {Record<string, Rule>?} block
+ * @returns
+ */
 function makeTerm(keyword, args = {}, block = null) {
   const commas = [];
   const entries = Object.entries(args);
@@ -37,21 +48,10 @@ function makeTerm(keyword, args = {}, block = null) {
   return seq(parens, "{", ...blockFields, "}");
 }
 
-/// <reference types="tree-sitter-cli/dsl" />
-// @ts-check
-
 export default grammar({
   name: "asl",
 
-  extras: (_) => [
-    /\s/,
-    /\n/,
-    /\r/,
-    // line comment (//)
-    /\/\/[^\n]*/,
-    // block comment (/* ... */)
-    /\/\*([^*]|\*+[^*/])*\*+\//,
-  ],
+  extras: ($) => [/\s/, $.comment],
 
   conflicts: ($) => [
     // these both parse symbolic_expression_term so we need to look further ahead to differentiate
@@ -101,12 +101,16 @@ export default grammar({
   rules: {
     source_file: ($) => optional($.asl_code),
 
+    comment: (_) =>
+      token(
+        choice(seq("//", /[^\n]*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/")),
+      ),
+
     // 19.2.2 ASL Name and Pathname Terms
     _root_char: (_) => "\\",
     _parent_prefix_char: (_) => "^",
     _parent_prefix_list: ($) => repeat1($._parent_prefix_char),
     _path_separator_char: (_) => ".",
-    name_seg: (_) => /[A-Za-z_][0-9A-Za-z_]{0,3}/,
     // NOTE: this differs from the spec slightly to avoid empty string matching
     name_string: ($) =>
       choice(
@@ -2348,5 +2352,10 @@ export default grammar({
     pin_group: (_) => /PinGroup/i,
     pin_group_config: (_) => /PinGroupConfig/i,
     pin_group_function: (_) => /PinGroupFunction/i,
+
+    // this needs to be last because treesitter matches based on defintion order sometimes.
+    // Keywords like `Name` and name_seg could both match at the same time, and we want name_seg
+    // to have less precedence
+    name_seg: (_) => /[A-Za-z_][0-9A-Za-z_]{0,3}/,
   },
 });
