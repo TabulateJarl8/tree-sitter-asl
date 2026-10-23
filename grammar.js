@@ -53,6 +53,37 @@ export default grammar({
     /\/\*([^*]|\*+[^*/])*\*+\//,
   ],
 
+  conflicts: ($) => [
+    // these both parse symbolic_expression_term so we need to look further ahead to differentiate
+    [$.expression_opcode, $.integer_type_opcode],
+    // both match expression_opcode
+    [$.term, $.term_arg],
+    // both match concat_res_term
+    [$.expression_opcode, $.buffer_type_opcode],
+    // all match concat_term
+    [$.expression_opcode, $.string_type_opcode, $.buffer_type_opcode],
+    // all match deref_of_term
+    [
+      $.expression_opcode,
+      $.integer_type_opcode,
+      $.string_type_opcode,
+      $.buffer_type_opcode,
+    ],
+    // both match fprintf_term
+    [$.expression_opcode, $.string_type_opcode],
+    // multiple parent prefix ambiguity
+    [$.name_string],
+    // standalone name vs function call
+    [$.term_arg, $.method_invocation_term],
+    // ambiguity when integer or const is passed as pkg length
+    [$._byte_const_expr, $.integer_data],
+    [$._byte_const_expr, $.const_term],
+    // ambiguous opcode returns
+    [$.integer_type_opcode, $.string_type_opcode],
+    [$.buffer_type_opcode, $.string_type_opcode],
+    [$.buffer_type_opcode, $.integer_type_opcode, $.string_type_opcode],
+  ],
+
   inline: ($) => [
     $.word_const,
     $.byte_const,
@@ -71,24 +102,16 @@ export default grammar({
     source_file: ($) => optional($.asl_code),
 
     // 19.2.2 ASL Name and Pathname Terms
-    _lead_name_char: (_) => /[A-Za-z_]/,
-    _digit_char: (_) => /[0-9]/,
-    _name_char: ($) => choice($._digit_char, $._lead_name_char),
     _root_char: (_) => "\\",
     _parent_prefix_char: (_) => "^",
+    _parent_prefix_list: ($) => repeat1($._parent_prefix_char),
     _path_separator_char: (_) => ".",
-    name_seg: ($) =>
-      seq(
-        $._lead_name_char,
-        optional($._name_char),
-        optional($._name_char),
-        optional($._name_char),
-      ),
+    name_seg: (_) => /[A-Za-z_][0-9A-Za-z_]{0,3}/,
     // NOTE: this differs from the spec slightly to avoid empty string matching
     name_string: ($) =>
       choice(
         seq($._root_char, optional($.name_path)),
-        seq(repeat1($._parent_prefix_char), optional($.name_path)),
+        seq($._parent_prefix_list, optional($.name_path)),
         $.name_path,
       ),
     // NOTE: this differs from the spec slightly to avoid empty string matching
@@ -98,11 +121,7 @@ export default grammar({
     // 19.2.3 ASL Root and Secondary Terms
     // Root Terms
     asl_code: ($) => $.definition_block_list,
-    definition_block_list: ($) =>
-      choice(
-        $.definition_block_term,
-        seq($.definition_block_term, $.definition_block_list),
-      ),
+    definition_block_list: ($) => repeat1($.definition_block_term),
     // Major Terms
     super_name: ($) =>
       choice(
@@ -123,8 +142,6 @@ export default grammar({
         $.arg_term,
         $.local_term,
         $.name_string,
-        // WARN: the spec says "SymbolicExpression" but thats never defined so im assuming its this
-        $.symbolic_expression_term,
       ),
     method_invocation_term: ($) =>
       seq($.name_string, "(", optional($.arg_list), ")"),
@@ -173,14 +190,7 @@ export default grammar({
     parameter_types_package_list: ($) => commaSep1($.parameter_type_package),
     // NOTE: this must be marked optional() in the parent
     term_list: ($) => repeat1(seq($.term, optional(";"))),
-    term: ($) =>
-      choice(
-        $.object,
-        $.statement_opcode,
-        $.expression_opcode,
-        // WARN: the spec says "SymbolicExpression" here and im guessing they mean the term
-        $.symbolic_expression_term,
-      ),
+    term: ($) => choice($.object, $.statement_opcode, $.expression_opcode),
     object: ($) =>
       choice($.compiler_directive, $.named_object, $.name_space_modifier),
 
@@ -520,14 +530,18 @@ export default grammar({
       }),
 
     add_compound_term: ($) =>
-      seq(
-        field("addend1_result", $.term_arg),
-        "+=",
-        field("addend2", $.term_arg),
+      prec.right(
+        seq(
+          field("addend1_result", $.term_arg),
+          "+=",
+          field("addend2", $.term_arg),
+        ),
       ),
 
     add_symbolic_term: ($) =>
-      seq(field("addend1", $.term_arg), "+", field("addend2", $.term_arg)),
+      prec.left(
+        seq(field("addend1", $.term_arg), "+", field("addend2", $.term_arg)),
+      ),
 
     add_term: ($) =>
       makeTerm($.add, {
@@ -543,14 +557,18 @@ export default grammar({
       }),
 
     and_compound_term: ($) =>
-      seq(
-        field("source1_result", $.term_arg),
-        "&=",
-        field("source2", $.term_arg),
+      prec.right(
+        seq(
+          field("source1_result", $.term_arg),
+          "&=",
+          field("source2", $.term_arg),
+        ),
       ),
 
     and_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "&", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "&", field("source2", $.term_arg)),
+      ),
 
     and_term: ($) =>
       makeTerm($.and, {
@@ -720,14 +738,18 @@ export default grammar({
       ),
 
     divide_compound_term: ($) =>
-      seq(
-        field("dividend_result", $.term_arg),
-        "/=",
-        field("divisor", $.term_arg),
+      prec.right(
+        seq(
+          field("dividend_result", $.term_arg),
+          "/=",
+          field("divisor", $.term_arg),
+        ),
       ),
 
     divide_symbolic_term: ($) =>
-      seq(field("dividend", $.term_arg), "/", field("divisor", $.term_arg)),
+      prec.left(
+        seq(field("dividend", $.term_arg), "/", field("divisor", $.term_arg)),
+      ),
 
     divide_term: ($) =>
       makeTerm($.divide, {
@@ -868,7 +890,9 @@ export default grammar({
       }),
 
     l_and_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "&&", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "&&", field("source2", $.term_arg)),
+      ),
 
     l_and_term: ($) =>
       makeTerm($.l_and, {
@@ -877,7 +901,9 @@ export default grammar({
       }),
 
     l_equal_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "==", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "==", field("source2", $.term_arg)),
+      ),
 
     l_equal_term: ($) =>
       makeTerm($.l_equal, {
@@ -886,7 +912,9 @@ export default grammar({
       }),
 
     l_greater_equal_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), ">=", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), ">=", field("source2", $.term_arg)),
+      ),
 
     l_greater_equal_term: ($) =>
       makeTerm($.l_greater_equal, {
@@ -895,7 +923,9 @@ export default grammar({
       }),
 
     l_greater_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), ">", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), ">", field("source2", $.term_arg)),
+      ),
 
     l_greater_term: ($) =>
       makeTerm($.l_greater, {
@@ -904,7 +934,9 @@ export default grammar({
       }),
 
     l_less_equal_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "<=", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "<=", field("source2", $.term_arg)),
+      ),
 
     l_less_equal_term: ($) =>
       makeTerm($.l_less_equal, {
@@ -913,7 +945,9 @@ export default grammar({
       }),
 
     l_less_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "<", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "<", field("source2", $.term_arg)),
+      ),
 
     l_less_term: ($) =>
       makeTerm($.l_less, {
@@ -922,7 +956,9 @@ export default grammar({
       }),
 
     l_not_equal_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "!=", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "!=", field("source2", $.term_arg)),
+      ),
 
     l_not_equal_term: ($) =>
       makeTerm($.l_not_equal, {
@@ -930,12 +966,14 @@ export default grammar({
         source2: $.term_arg,
       }),
 
-    l_not_symbolic_term: ($) => seq("!", field("source", $.term_arg)),
+    l_not_symbolic_term: ($) => prec(1, seq("!", field("source", $.term_arg))),
 
     l_not_term: ($) => makeTerm($.l_not, { source: $.term_arg }),
 
     l_or_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "||", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "||", field("source2", $.term_arg)),
+      ),
 
     l_or_term: ($) =>
       makeTerm($.l_or, {
@@ -994,14 +1032,18 @@ export default grammar({
       }),
 
     mod_compound_term: ($) =>
-      seq(
-        field("dividend_result", $.term_arg),
-        "%=",
-        field("divisor", $.term_arg),
+      prec.right(
+        seq(
+          field("dividend_result", $.term_arg),
+          "%=",
+          field("divisor", $.term_arg),
+        ),
       ),
 
     mod_symbolic_term: ($) =>
-      seq(field("dividend", $.term_arg), "%", field("divisor", $.term_arg)),
+      prec.left(
+        seq(field("dividend", $.term_arg), "%", field("divisor", $.term_arg)),
+      ),
 
     mod_term: ($) =>
       makeTerm($.mod, {
@@ -1011,17 +1053,21 @@ export default grammar({
       }),
 
     multiply_compound_term: ($) =>
-      seq(
-        field("multiplicand_result", $.term_arg),
-        "*=",
-        field("multiplier", $.term_arg),
+      prec.right(
+        seq(
+          field("multiplicand_result", $.term_arg),
+          "*=",
+          field("multiplier", $.term_arg),
+        ),
       ),
 
     multiply_symbolic_term: ($) =>
-      seq(
-        field("multiplicand", $.term_arg),
-        "*",
-        field("multiplier", $.term_arg),
+      prec.left(
+        seq(
+          field("multiplicand", $.term_arg),
+          "*",
+          field("multiplier", $.term_arg),
+        ),
       ),
 
     multiply_term: ($) =>
@@ -1065,7 +1111,7 @@ export default grammar({
         notification_value: $.term_arg,
       }),
 
-    not_symbolic_term: ($) => seq("~", field("source", $.term_arg)),
+    not_symbolic_term: ($) => prec(1, seq("~", field("source", $.term_arg))),
 
     not_term: ($) =>
       makeTerm($.not, {
@@ -1097,14 +1143,18 @@ export default grammar({
       }),
 
     or_compound_term: ($) =>
-      seq(
-        field("source1_result", $.term_arg),
-        "|=",
-        field("source2", $.term_arg),
+      prec.right(
+        seq(
+          field("source1_result", $.term_arg),
+          "|=",
+          field("source2", $.term_arg),
+        ),
       ),
 
     or_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "|", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "|", field("source2", $.term_arg)),
+      ),
 
     or_term: ($) =>
       makeTerm($.or, {
@@ -1218,14 +1268,22 @@ export default grammar({
       ),
 
     shift_left_compound_term: ($) =>
-      seq(
-        field("source_result", $.term_arg),
-        "<<=",
-        field("shift_count", $.term_arg),
+      prec.right(
+        seq(
+          field("source_result", $.term_arg),
+          "<<=",
+          field("shift_count", $.term_arg),
+        ),
       ),
 
     shift_left_symbolic_term: ($) =>
-      seq(field("source", $.term_arg), "<<", field("shift_count", $.term_arg)),
+      prec.left(
+        seq(
+          field("source", $.term_arg),
+          "<<",
+          field("shift_count", $.term_arg),
+        ),
+      ),
 
     shift_left_term: ($) =>
       makeTerm($.shift_left, {
@@ -1235,14 +1293,22 @@ export default grammar({
       }),
 
     shift_right_compound_term: ($) =>
-      seq(
-        field("source_result", $.term_arg),
-        ">>=",
-        field("shift_count", $.term_arg),
+      prec.right(
+        seq(
+          field("source_result", $.term_arg),
+          ">>=",
+          field("shift_count", $.term_arg),
+        ),
       ),
 
     shift_right_symbolic_term: ($) =>
-      seq(field("source", $.term_arg), ">>", field("shift_count", $.term_arg)),
+      prec.left(
+        seq(
+          field("source", $.term_arg),
+          ">>",
+          field("shift_count", $.term_arg),
+        ),
+      ),
 
     shift_right_term: ($) =>
       makeTerm($.shift_right, {
@@ -1260,20 +1326,32 @@ export default grammar({
     stall_term: ($) => makeTerm($.stall, { microseconds: $.term_arg }),
 
     store_symbolic_term: ($) =>
-      seq(field("destination", $.super_name), "=", field("source", $.term_arg)),
+      prec.left(
+        prec.right(
+          seq(
+            field("destination", $.super_name),
+            "=",
+            field("source", $.term_arg),
+          ),
+        ),
+      ),
 
     store_term: ($) =>
       makeTerm($.store, { source: $.term_arg, destination: $.super_name }),
 
     subtract_compound_term: ($) =>
-      seq(
-        field("minuend_result", $.term_arg),
-        "-=",
-        field("subtrahend", $.term_arg),
+      prec.right(
+        seq(
+          field("minuend_result", $.term_arg),
+          "-=",
+          field("subtrahend", $.term_arg),
+        ),
       ),
 
     subtract_symbolic_term: ($) =>
-      seq(field("minuend", $.term_arg), "-", field("subtrahend", $.term_arg)),
+      prec.left(
+        seq(field("minuend", $.term_arg), "-", field("subtrahend", $.term_arg)),
+      ),
 
     subtract_term: ($) =>
       makeTerm($.subtract, {
@@ -1349,14 +1427,18 @@ export default grammar({
       ),
 
     xor_compound_term: ($) =>
-      seq(
-        field("source1_result", $.term_arg),
-        "^=",
-        field("source2", $.term_arg),
+      prec.right(
+        seq(
+          field("source1_result", $.term_arg),
+          "^=",
+          field("source2", $.term_arg),
+        ),
       ),
 
     xor_symbolic_term: ($) =>
-      seq(field("source1", $.term_arg), "^", field("source2", $.term_arg)),
+      prec.left(
+        seq(field("source1", $.term_arg), "^", field("source2", $.term_arg)),
+      ),
 
     xor_term: ($) =>
       makeTerm($.xor, {
@@ -1367,19 +1449,12 @@ export default grammar({
 
     // 19.2.7 ASL Parameter Keyword Terms
     // Most of this was generated from a web scraping of uefi.org that i did
-    attrib_bytes: ($) => makeTerm(/AttribBytes/i, { n: $._byte_const_expr }),
-    attrib_raw_bytes: ($) =>
-      makeTerm(/AttribRawBytes/i, { n: $._byte_const_expr }),
-    attrib_raw_process_bytes: ($) =>
-      makeTerm(/AttribRawProcessBytes/i, { n: $._byte_const_expr }),
     access_attrib_keyword: ($) =>
       choice(
         /AttribQuick/i,
         /AttribSendReceive/i,
         /AttribByte/i,
-        $.attrib_bytes,
-        $.attrib_raw_bytes,
-        $.attrib_raw_process_bytes,
+        // AttribBytes, AttribRawBytes, and AttribRawProcessBytes and handled by extended_access_attrib_keyword
         /AttribWord/i,
         /AttribBlock/i,
         /AttribProcessCall/i,
