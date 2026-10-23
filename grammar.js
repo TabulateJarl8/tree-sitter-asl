@@ -1381,7 +1381,12 @@ export default grammar({
     address_space_keyword: ($) => choice($.region_space_keyword, /FFixedHW/i),
     addressing_mode_keyword: (_) =>
       choice(/AddressingMode7Bit/i, /AddressingMode10Bit/i),
-    byte_length_keyword: (_) =>
+    bus_master_keyword: (_) => choice(/BusMaster/i, /NotBusMaster/i),
+    clock_phase_keyword: (_) => choice(/ClockPhaseFirst/i, /ClockPhaseSecond/i),
+    clock_polarity_keyword: (_) =>
+      choice(/ClockPolarityLow/i, /ClockPolarityHigh/i),
+    // NOTE: renamed from byte_length_keyword to match the grammar in UARTSerialBusTerm
+    data_bits_keyword: (_) =>
       choice(
         /DataBitsFive/i,
         /DataBitsSix/i,
@@ -1389,12 +1394,9 @@ export default grammar({
         /DataBitsEight/i,
         /DataBitsNine/i,
       ),
-    bus_master_keyword: (_) => choice(/BusMaster/i, /NotBusMaster/i),
-    clock_phase_keyword: (_) => choice(/ClockPhaseFirst/i, /ClockPhaseSecond/i),
-    clock_polarity_keyword: (_) =>
-      choice(/ClockPolarityLow/i, /ClockPolarityHigh/i),
     decode_keyword: (_) => choice(/SubDecode/i, /PosDecode/i),
-    endian_keyword: (_) => choice(/BigEndianing/i, /LittleEndian/i),
+    // NOTE: changed from endian_keyword to match the rest of the grammar
+    endianess_keyword: (_) => choice(/BigEndianing/i, /LittleEndian/i),
     extended_access_attrib_keyword: (_) =>
       choice(/AttribBytes/i, /AttribRawBytes/i, /AttribRawProcessBytes/i),
     flow_control_keyword: (_) =>
@@ -1435,7 +1437,8 @@ export default grammar({
         /ThermalZoneObj/i,
         /BuffFieldObj/i,
       ),
-    parity_keyword: (_) =>
+    // NOTE: renamed from parity_keyword to match definition in UARTSerialBusTerm
+    parity_type_keyword: (_) =>
       choice(
         /ParityTypeNone/i,
         /ParityTypeSpace/i,
@@ -1497,6 +1500,576 @@ export default grammar({
     wire_mode_keyword: (_) => choice(/ThreeWireMode/i, /FourWireMode/i),
 
     // 19.2.8 ASL Resource Template Terms
+    // NOTE: this was also parsed from a web scraping. i went over it to fix obvious bugs but there may be some remaining
+    _resource_macro_list: ($) => repeat(seq($.resource_macro_term)),
+    resource_macro_term: ($) =>
+      choice(
+        $.dma_term,
+        $.dword_io_term,
+        $.dword_memory_term,
+        $.dword_space_term,
+        $.end_dependent_fn_term,
+        $.extended_io_term,
+        $.extended_memory_term,
+        $.extended_space_term,
+        $.fixed_dma_term,
+        $.fixed_io_term,
+        $.gpio_int_term,
+        $.gpio_io_term,
+        $.i2c_serial_bus_term,
+        $.interrupt_term,
+        $.io_term,
+        $.irq_no_flags_term,
+        $.irq_term,
+        $.memory24_term,
+        $.memory32_fixed_term,
+        $.memory32_term,
+        $.pin_config_term,
+        $.pin_function_term,
+        $.pin_group_term,
+        $.pin_group_config_term,
+        $.pin_group_function_term,
+        $.qword_io_term,
+        $.qword_memory_term,
+        $.qword_space_term,
+        $.register_term,
+        $.spi_serial_bus_term,
+        $.start_dependent_fn_term,
+        $.start_dependent_fn_no_pri_term,
+        $.uart_serial_bus_term,
+        $.vendor_long_term,
+        $.vendor_short_term,
+        $.word_bus_number_term,
+        $.word_io_term,
+        $.word_space_term,
+      ),
+
+    dma_term: ($) =>
+      makeTerm(
+        $.dma,
+        {
+          dma_type: $.dma_type_keyword,
+          bus_master: $.bus_master_keyword,
+          xfer_type: $.xfer_type_keyword,
+          descriptor_name: optional($.name_string),
+        },
+        { byte_list: $.byte_list },
+      ),
+
+    dword_io_term: ($) =>
+      makeTerm($.dword_io, {
+        resource_usage: optional($.resource_type_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        decode: optional($.decode_keyword),
+        range_type: optional($.range_type_keyword),
+        address_granularity: $.dword_const_expr,
+        min_address: $.dword_const_expr,
+        max_address: $.dword_const_expr,
+        address_translation: $.dword_const_expr,
+        address_length: $.dword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+        translation_type: optional($.type_keyword),
+        translation_density: optional($.translation_keyword),
+      }),
+
+    dword_memory_term: ($) =>
+      makeTerm($.dword_memory, {
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        mem_type: optional($.mem_type_keyword),
+        read_write_type: $.read_write_keyword,
+        address_granularity: $.dword_const_expr,
+        min_address: $.dword_const_expr,
+        max_address: $.dword_const_expr,
+        address_translation: $.dword_const_expr,
+        address_length: $.dword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+        memory_range_type: optional($.address_keyword),
+        translation_type: optional($.type_keyword),
+      }),
+
+    dword_space_term: ($) =>
+      makeTerm($.dword_space, {
+        resource_type: $.byte_const_expr,
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        type_specific_flags: $.byte_const_expr,
+        address_granularity: $.dword_const_expr,
+        min_address: $.dword_const_expr,
+        max_address: $.dword_const_expr,
+        address_translation: $.dword_const_expr,
+        address_length: $.dword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+      }),
+
+    end_dependent_fn_term: ($) => seq($.end_dependent_fn, "(", ")"),
+
+    extended_io_term: ($) =>
+      makeTerm($.extended_io, {
+        resource_usage: optional($.resource_type_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        decode: optional($.decode_keyword),
+        range_type: optional($.range_type_keyword),
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        type_specific_attributes: optional($.qword_const_expr),
+        descriptor_name: optional($.name_string),
+        translation_type: optional($.type_keyword),
+        translation_density: optional($.translation_keyword),
+      }),
+
+    extended_memory_term: ($) =>
+      makeTerm($.extended_memory, {
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        mem_type: optional($.mem_type_keyword),
+        read_write_type: $.read_write_keyword,
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        type_specific_attributes: optional($.qword_const_expr),
+        descriptor_name: optional($.name_string),
+        memory_range_type: optional($.address_keyword),
+        translation_type: optional($.type_keyword),
+      }),
+
+    extended_space_term: ($) =>
+      makeTerm($.extended_space, {
+        resource_type: $.byte_const_expr,
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        type_specific_flags: $.byte_const_expr,
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        type_specific_attributes: optional($.qword_const_expr),
+        descriptor_name: optional($.name_string),
+      }),
+
+    fixed_dma_term: ($) =>
+      makeTerm($.fixed_dma, {
+        dma_req: $.word_const_expr,
+        channel: $.word_const_expr,
+        xfer_width: optional($.transfer_width_keyword),
+        descriptor_name: optional($.name_string),
+      }),
+
+    fixed_io_term: ($) =>
+      makeTerm($.fixed_io, {
+        address_base: $.word_const_expr,
+        range_length: $.byte_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    gpio_int_term: ($) =>
+      makeTerm(
+        $.gpio_int,
+        {
+          interrupt_type: $.interrupt_type_keyword,
+          interrupt_level: $.interrupt_level_keyword,
+          share_type: optional($.share_type_keyword),
+          pin_config: choice($.pin_config_keyword, $.byte_const_expr),
+          de_bounce_time: optional($.word_const_expr),
+          resource_source: $.string_data,
+          resource_source_index: optional($.byte_const_expr),
+          resource_usage: optional($.resource_type_keyword),
+          descriptor_name: optional($.name_string),
+          vendor_data: optional($.raw_data_buffer),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    gpio_io_term: ($) =>
+      makeTerm(
+        $.gpio_io,
+        {
+          share_type: optional($.share_type_keyword),
+          pin_config: choice($.pin_config_keyword, $.byte_const_expr),
+          de_bounce_time: optional($.word_const_expr),
+          drive_strength: optional($.word_const_expr),
+          io_restriction: optional($.io_restriction_keyword),
+          resource_source: $.string_data,
+          resource_source_index: optional($.byte_const_expr),
+          resource_usage: optional($.resource_type_keyword),
+          descriptor_name: optional($.name_string),
+          vendor_data: optional($.raw_data_buffer),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    i2c_serial_bus_term: ($) =>
+      makeTerm($.i2c_serial_bus_v2, {
+        slave_address: $.word_const_expr,
+        slave_mode: optional($.slave_mode_keyword),
+        connection_speed: $.dword_const_expr,
+        // WARN: the spec says "AddressModeKeyword" but i think thats a typo
+        addressing_mode: optional($.addressing_mode_keyword),
+        resource_source: $.string_data,
+        resource_source_index: optional($.byte_const_expr),
+        resource_usage: optional($.resource_type_keyword),
+        descriptor_name: optional($.name_string),
+        share_type: optional($.share_type_keyword),
+        vendor_data: optional($.raw_data_buffer),
+      }),
+
+    interrupt_term: ($) =>
+      makeTerm(
+        $.interrupt,
+        {
+          resource_type: optional($.resource_type_keyword),
+          interrupt_type: $.interrupt_type_keyword,
+          interrupt_level: $.interrupt_level_keyword,
+          share_type: optional($.share_type_keyword),
+          resource_source_index: optional($.byte_const_expr),
+          resource_source: optional($.string_data),
+          descriptor_name: optional($.name_string),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    io_term: ($) =>
+      makeTerm($.io, {
+        io_decode: $.io_decode_keyword,
+        min_address: $.word_const_expr,
+        max_address: $.word_const_expr,
+        alignment: $.byte_const_expr,
+        range_length: $.byte_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    irq_no_flags_term: ($) =>
+      makeTerm(
+        $.irq_no_flags,
+        {
+          descriptor_name: optional($.name_string),
+        },
+        { byte_list: $.byte_list },
+      ),
+
+    irq_term: ($) =>
+      makeTerm(
+        $.irq,
+        {
+          interrupt_type: $.interrupt_type_keyword,
+          interrupt_level: $.interrupt_level_keyword,
+          share_type: optional($.share_type_keyword),
+          descriptor_name: optional($.name_string),
+        },
+        { byte_list: $.byte_list },
+      ),
+
+    memory24_term: ($) =>
+      makeTerm($.memory24, {
+        read_write_type: $.read_write_keyword,
+        // NOTE: spec says [23:8] which im ignoring
+        min_address: $.word_const_expr,
+        max_address: $.word_const_expr,
+        alignment: $.word_const_expr,
+        range_length: $.word_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    memory32_fixed_term: ($) =>
+      makeTerm($.memory32_fixed, {
+        read_write_type: $.read_write_keyword,
+        address_base: $.dword_const_expr,
+        range_length: $.dword_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    memory32_term: ($) =>
+      makeTerm($.memory32, {
+        read_write_type: $.read_write_keyword,
+        min_address: $.dword_const_expr,
+        max_address: $.dword_const_expr,
+        alignment: $.dword_const_expr,
+        range_length: $.dword_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    pin_config_term: ($) =>
+      makeTerm(
+        $.pin_config,
+        {
+          share_type: optional($.share_type_keyword),
+          pin_config_type: $.byte_data,
+          pin_config_value: $.byte_data,
+          resource_source: $.string_data,
+          resource_source_index: optional($.byte_const_expr),
+          resource_usage: optional($.resource_type_keyword),
+          descriptor_name: optional($.name_string),
+          vendor_data: optional($.raw_data_buffer),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    pin_function_term: ($) =>
+      makeTerm(
+        $.pin_function,
+        {
+          share_type: optional($.share_type_keyword),
+          pin_pull_configuration: $.pin_config_keyword,
+          function_number: $.word_data,
+          resource_source: $.string_data,
+          resource_source_index: optional($.byte_const_expr),
+          resource_usage: optional($.resource_type_keyword),
+          descriptor_name: optional($.name_string),
+          vendor_data: optional($.raw_data_buffer),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    pin_group_term: ($) =>
+      makeTerm(
+        $.pin_group,
+        {
+          resource_label: $.string_data,
+          resource_usage: optional($.resource_type_keyword),
+          descriptor_name: optional($.name_string),
+          vendor_data: optional($.raw_data_buffer),
+        },
+        { dword_list: $.dword_list },
+      ),
+
+    pin_group_config_term: ($) =>
+      makeTerm($.pin_group_config, {
+        share_type: optional($.share_type_keyword),
+        pin_config_type: $.byte_data,
+        pin_config_value: $.byte_data,
+        resource_source: $.string_data,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source_label: $.string_data,
+        resource_usage: optional($.resource_type_keyword),
+        descriptor_name: optional($.name_string),
+        vendor_data: optional($.raw_data_buffer),
+      }),
+
+    pin_group_function_term: ($) =>
+      makeTerm($.pin_group_function, {
+        share_type: optional($.share_type_keyword),
+        function_number: $.word_data,
+        resource_source: $.string_data,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source_label: $.string_data,
+        resource_usage: optional($.resource_type_keyword),
+        descriptor_name: optional($.name_string),
+        vendor_data: optional($.raw_data_buffer),
+      }),
+
+    qword_io_term: ($) =>
+      makeTerm($.qword_io, {
+        resource_usage: optional($.resource_type_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        decode: optional($.decode_keyword),
+        range_type: optional($.range_type_keyword),
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+        translation_type: optional($.type_keyword),
+        translation_density: optional($.translation_keyword),
+      }),
+
+    qword_memory_term: ($) =>
+      makeTerm($.qword_memory, {
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        mem_type: optional($.mem_type_keyword),
+        read_write_type: $.read_write_keyword,
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+        memory_range_type: optional($.address_keyword),
+        translation_type: optional($.type_keyword),
+      }),
+
+    qword_space_term: ($) =>
+      makeTerm($.qword_space, {
+        resource_type: $.byte_const_expr,
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        type_specific_flags: $.byte_const_expr,
+        address_granularity: $.qword_const_expr,
+        min_address: $.qword_const_expr,
+        max_address: $.qword_const_expr,
+        address_translation: $.qword_const_expr,
+        address_length: $.qword_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+      }),
+
+    register_term: ($) =>
+      makeTerm($.register, {
+        address_space_id: $.address_space_keyword,
+        register_bit_width: $.byte_const_expr,
+        register_offset: $.byte_const_expr,
+        register_address: $.qword_const_expr,
+        access_size: $.byte_const_expr,
+        descriptor_name: optional($.name_string),
+      }),
+
+    spi_serial_bus_term: ($) =>
+      makeTerm($.spi_serial_bus_v2, {
+        device_selection: $.word_const_expr,
+        device_selection_polarity: optional($.device_polarity_keyword),
+        wire_mode: optional($.wire_mode_keyword),
+        data_bit_length: $.byte_const_expr,
+        slave_mode: optional($.slave_mode_keyword),
+        connection_speed: $.dword_const_expr,
+        clock_polarity: $.clock_polarity_keyword,
+        clock_phase: $.clock_phase_keyword,
+        resource_source: $.string_data,
+        resource_source_index: optional($.byte_const_expr),
+        resource_usage: optional($.resource_type_keyword),
+        descriptor_name: optional($.name_string),
+        share_type: optional($.share_type_keyword),
+        vendor_data: optional($.raw_data_buffer),
+      }),
+
+    start_dependent_fn_no_pri_term: ($) =>
+      makeTerm(
+        $.start_dependent_fn_no_pri,
+        {},
+        { resource_macro_list: $.resource_macro_list },
+      ),
+
+    start_dependent_fn_term: ($) =>
+      makeTerm(
+        $.start_dependent_fn,
+        {
+          compat_priority: $.byte_const_expr,
+          perf_robust_priority: $.byte_const_expr,
+        },
+        { resource_macro_list: $.resource_macro_list },
+      ),
+
+    uart_serial_bus_term: ($) =>
+      makeTerm($.uart_serial_bus_v2, {
+        initial_baudrate: $.dword_const_expr,
+        bits_per_byte: optional($.data_bits_keyword),
+        stop_bits: optional($.stop_bits_keyword),
+        lines_in_use: $.byte_const_expr,
+        is_big_endian: optional($.endianess_keyword),
+        parity: optional($.parity_type_keyword),
+        flow_control: optional($.flow_control_keyword),
+        receive_buffer_size: $.word_const_expr,
+        transmit_buffer_size: $.word_const_expr,
+        resource_source: $.string_data,
+        resource_source_index: optional($.byte_const_expr),
+        resource_usage: optional($.resource_type_keyword),
+        descriptor_name: optional($.name_string),
+        share_type: optional($.share_type_keyword),
+        vendor_data: optional($.object),
+      }),
+
+    vendor_long_term: ($) =>
+      makeTerm(
+        $.vendor_long,
+        {
+          descriptor_name: optional($.name_string),
+        },
+        { byte_list: $.byte_list },
+      ),
+
+    vendor_short_term: ($) =>
+      makeTerm(
+        $.vendor_short,
+        {
+          descriptor_name: optional($.name_string),
+        },
+        { byte_list: $.byte_list },
+      ),
+
+    word_bus_number_term: ($) =>
+      makeTerm($.word_bus_number, {
+        resource_usage: optional($.resource_type_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        decode: optional($.decode_keyword),
+        address_granularity: $.word_const_expr,
+        min_address: $.word_const_expr,
+        max_address: $.word_const_expr,
+        address_translation: $.word_const_expr,
+        address_length: $.word_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+      }),
+
+    word_io_term: ($) =>
+      makeTerm($.word_io, {
+        resource_usage: optional($.resource_type_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        decode: optional($.decode_keyword),
+        range_type: optional($.range_type_keyword),
+        address_granularity: $.word_const_expr,
+        min_address: $.word_const_expr,
+        max_address: $.word_const_expr,
+        address_translation: $.word_const_expr,
+        address_length: $.word_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+        translation_type: optional($.type_keyword),
+        translation_density: optional($.translation_keyword),
+      }),
+
+    word_space_term: ($) =>
+      makeTerm($.word_space, {
+        resource_type: $.byte_const_expr,
+        resource_usage: optional($.resource_type_keyword),
+        decode: optional($.decode_keyword),
+        min_type: optional($.min_keyword),
+        max_type: optional($.max_keyword),
+        type_specific_flags: $.byte_const_expr,
+        address_granularity: $.word_const_expr,
+        min_address: $.word_const_expr,
+        max_address: $.word_const_expr,
+        address_translation: $.word_const_expr,
+        address_length: $.word_const_expr,
+        resource_source_index: optional($.byte_const_expr),
+        resource_source: optional($.string_data),
+        descriptor_name: optional($.name_string),
+      }),
 
     // ASL Operators (all case insensitive)
     // Table 19.16 ASL compiler controls
