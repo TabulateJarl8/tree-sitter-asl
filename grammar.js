@@ -433,7 +433,7 @@ export default grammar({
         $.dec_term,
         $.deref_of_term,
         $.divide_term,
-        $.eisaid_term,
+        $.eisa_id_term,
         $.find_set_left_bit_term,
         $.find_set_right_bit_term,
         $.from_bcd_term,
@@ -659,6 +659,13 @@ export default grammar({
         source_buffer: $.term_arg,
         byte_index: $.term_arg,
         word_field_name: $.name_string,
+      }),
+    create_field_term: ($) =>
+      makeTerm($.create_field, {
+        source_buffer: $.term_arg,
+        bit_index: $.term_arg,
+        num_bits: $.term_arg,
+        field_name: $.name_string,
       }),
 
     data_region_term: ($) =>
@@ -1395,6 +1402,9 @@ export default grammar({
         /DataBitsNine/i,
       ),
     decode_keyword: (_) => choice(/SubDecode/i, /PosDecode/i),
+    // NOTE: this was missing from the grammar definition so i wrote it from referencing 19.6.33
+    dma_type_keyword: (_) =>
+      choice(/Compatibility/i, /TypeA/i, /TypeB/i, /TypeF/i),
     // NOTE: changed from endian_keyword to match the rest of the grammar
     endianess_keyword: (_) => choice(/BigEndianing/i, /LittleEndian/i),
     extended_access_attrib_keyword: (_) =>
@@ -1448,7 +1458,8 @@ export default grammar({
       ),
     pin_config_keyword: (_) =>
       choice(/PullDefault/i, /PullUp/i, /PullDown/i, /PullNone/i),
-    polarity_keyword: (_) => choice(/PolarityHigh/i, /PolarityLow/i),
+    // NOTE: renamed from polarity_keyword to match definition in SPISerialBusV2
+    device_polarity_keyword: (_) => choice(/PolarityHigh/i, /PolarityLow/i),
     range_type_keyword: (_) =>
       choice(/ISAOnlyRanges/i, /NonISAOnlyRanges/i, /EntireRange/i),
     read_write_keyword: (_) => choice(/ReadWrite/i, /ReadOnly/i),
@@ -1501,7 +1512,7 @@ export default grammar({
 
     // 19.2.8 ASL Resource Template Terms
     // NOTE: this was also parsed from a web scraping. i went over it to fix obvious bugs but there may be some remaining
-    _resource_macro_list: ($) => repeat(seq($.resource_macro_term)),
+    resource_macro_list: ($) => repeat(seq($.resource_macro_term)),
     resource_macro_term: ($) =>
       choice(
         $.dma_term,
@@ -1815,8 +1826,10 @@ export default grammar({
         $.pin_config,
         {
           share_type: optional($.share_type_keyword),
-          pin_config_type: $.byte_data,
-          pin_config_value: $.byte_data,
+          // NOTE: the spec shows this field as ByteData but i think thats a mistake
+          pin_config_type: $.byte_const_expr,
+          // NOTE: the spec shows this field as ByteData but i think thats a mistake
+          pin_config_value: $.byte_const_expr,
           resource_source: $.string_data,
           resource_source_index: optional($.byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
@@ -1832,7 +1845,8 @@ export default grammar({
         {
           share_type: optional($.share_type_keyword),
           pin_pull_configuration: $.pin_config_keyword,
-          function_number: $.word_data,
+          // NOTE: the spec shows this field as WordData but i think thats a mistake
+          function_number: $.word_const_expr,
           resource_source: $.string_data,
           resource_source_index: optional($.byte_const_expr),
           resource_usage: optional($.resource_type_keyword),
@@ -1857,8 +1871,10 @@ export default grammar({
     pin_group_config_term: ($) =>
       makeTerm($.pin_group_config, {
         share_type: optional($.share_type_keyword),
-        pin_config_type: $.byte_data,
-        pin_config_value: $.byte_data,
+        // NOTE: the spec shows this field as ByteData but i think thats a mistake
+        pin_config_type: $.byte_const_expr,
+        // NOTE: the spec shows this field as ByteData but i think thats a mistake
+        pin_config_value: $.byte_const_expr,
         resource_source: $.string_data,
         resource_source_index: optional($.byte_const_expr),
         resource_source_label: $.string_data,
@@ -1870,7 +1886,8 @@ export default grammar({
     pin_group_function_term: ($) =>
       makeTerm($.pin_group_function, {
         share_type: optional($.share_type_keyword),
-        function_number: $.word_data,
+        // NOTE: the spec shows this field as WordData but i think thats a mistake
+        function_number: $.word_const_expr,
         resource_source: $.string_data,
         resource_source_index: optional($.byte_const_expr),
         resource_source_label: $.string_data,
@@ -2117,6 +2134,7 @@ export default grammar({
     reset: (_) => /Reset/i,
     signal: (_) => /Signal/i,
     wait: (_) => /Wait/i,
+    unload: (_) => /Unload/i, // this table is missing Unload so i added it
     // Table 19.22 Object references
     cond_ref_of: (_) => /CondRefOf/i,
     deref_of: (_) => /DerefOf/i,
@@ -2165,6 +2183,7 @@ export default grammar({
     stall: (_) => /Stall/i,
     switch: (_) => /Switch/i,
     while: (_) => /While/i,
+    for: (_) => /For/i, // this table is missing For so i added it
     // Table 19.26 Data type conversion and manipulation
     concatenate: (_) => /Concatenate/i,
     copy_object: (_) => /CopyObject/i,
@@ -2208,9 +2227,9 @@ export default grammar({
     io: (_) => /IO/i,
     irq: (_) => /IRQ/i,
     irq_no_flags: (_) => /IRQNoFlags/i,
-    memory_24: (_) => /Memory24/i,
-    memory_32: (_) => /Memory32/i,
-    memory_32_fixed: (_) => /Memory32Fixed/i,
+    memory24: (_) => /Memory24/i,
+    memory32: (_) => /Memory32/i,
+    memory32_fixed: (_) => /Memory32Fixed/i,
     qword_io: (_) => /QWordIO/i,
     qword_memory: (_) => /QWordMemory/i,
     qword_space: (_) => /QWordSpace/i,
@@ -2230,5 +2249,11 @@ export default grammar({
     ones: (_) => /Ones/i,
     revision: (_) => /Revision/i,
     zero: (_) => /Zero/i,
+    // Pin* functions aren't in tables:
+    pin_config: (_) => /PinConfig/i,
+    pin_function: (_) => /PinFunction/i,
+    pin_group: (_) => /PinGroup/i,
+    pin_group_config: (_) => /PinGroupConfig/i,
+    pin_group_function: (_) => /PinGroupFunction/i,
   },
 });
