@@ -510,6 +510,9 @@ const grammarMap = defineGrammar({
         $.method_invocation_term,
         $.symbolic_expression_term,
         $.symbolic_assignment_term,
+        // these two aren't listed here in the spec but they're not referenced anywhere else so i added them
+        $.load_term,
+        $.load_table_term,
       ),
 
     integer_type_opcode: ($) =>

@@ -2733,6 +2733,14 @@
           "named": true
         },
         {
+          "type": "load_table_term",
+          "named": true
+        },
+        {
+          "type": "load_term",
+          "named": true
+        },
+        {
           "type": "match_term",
           "named": true
         },
@@ -5939,6 +5947,118 @@
       "types": [
         {
           "type": "l_or",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "load_table_term",
+    "named": true,
+    "fields": {
+      "oem_id_string": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "oem_table_id_string": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "parameter_data": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "parameter_path_string": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "root_path_string": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "signature_string": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "load_table",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "load_term",
+    "named": true,
+    "fields": {
+      "object": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "name_string",
+            "named": true
+          }
+        ]
+      },
+      "result": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "super_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "load",
           "named": true
         }
       ]
@@ -12771,6 +12891,14 @@
   },
   {
     "type": "l_or",
+    "named": true
+  },
+  {
+    "type": "load",
+    "named": true
+  },
+  {
+    "type": "load_table",
     "named": true
   },
   {

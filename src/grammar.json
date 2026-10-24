@@ -1797,6 +1797,14 @@
         {
           "type": "SYMBOL",
           "name": "symbolic_assignment_term"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "load_term"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "load_table_term"
         }
       ]
     },
