@@ -801,6 +801,9 @@ const grammarMap = defineGrammar({
         $.cond_ref_of_term,
         $.index_term,
         $.method_invocation_term,
+        // the spec doesn't explicitly allow for these, but my laptop's ASL uses these in DerefOfs
+        $.index_symbolic_term,
+        $.deref_of_term,
       ),
     deref_of_term: ($) => makeTerm($.deref_of, { source: $._deref_of_source }),
 
