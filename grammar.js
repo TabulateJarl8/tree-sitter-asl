@@ -18,6 +18,21 @@ function commaSep1(rule) {
 }
 
 /**
+ * Check if a given treesitter rule is optional
+ * @param {Rule} rule
+ * @returns
+ */
+function isOptional(rule) {
+  // optional() returns a ChoiceRule where one of the options is BlankRule
+  // https://github.com/tree-sitter/tree-sitter/blob/0fff6ab6ed206903856200e5390c5dad22924948/crates/generate/src/dsl.js#L60
+  return (
+    rule &&
+    rule.type === "CHOICE" &&
+    rule.members.some((m) => m.type === "BLANK")
+  );
+}
+
+/**
  *
  * @param {Rule} keyword
  * @param {Record<string, Rule>} args
@@ -28,6 +43,8 @@ function makeTerm(keyword, args = {}, block = null) {
   const commas = [];
   const entries = Object.entries(args);
 
+  // any optional rules need to be split into their own subrule so that we don't get state explosion
+  // its sort of vaguely talked about here https://github.com/tree-sitter/tree-sitter/wiki/Tips-and-Tricks-for-a-grammar-author
   for (let i = 0; i < entries.length; i++) {
     const [key, rule] = entries[i];
     const fielded = field(key, rule);
