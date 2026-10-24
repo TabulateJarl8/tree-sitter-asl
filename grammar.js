@@ -564,8 +564,7 @@ const grammarMap = defineGrammar({
         $.concat_res_term,
         $.deref_of_term,
         $.mid_term,
-        // TODO: this is a macro
-        // $.resource_template_term,
+        $.resource_template_term,
         $.to_buffer_term,
         $.to_pld_term,
         $.to_uuid_term,
@@ -1332,6 +1331,13 @@ const grammarMap = defineGrammar({
     release_term: ($) => makeTerm($.release, { sync_object: $.super_name }),
 
     reset_term: ($) => makeTerm($.reset, { sync_object: $.super_name }),
+
+    resource_template_term: ($) =>
+      makeTerm(
+        $.resource_template,
+        {},
+        { resource_macro_list: optional($.resource_macro_list) },
+      ),
 
     return_term: ($) => makeTerm($.return, { arg: optional($.term_arg) }),
 

@@ -592,6 +592,10 @@
           "named": true
         },
         {
+          "type": "resource_template_term",
+          "named": true
+        },
+        {
           "type": "to_buffer_term",
           "named": true
         },
@@ -9379,6 +9383,32 @@
     }
   },
   {
+    "type": "resource_template_term",
+    "named": true,
+    "fields": {
+      "resource_macro_list": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "resource_macro_list",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "resource_template",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "resource_type_keyword",
     "named": true,
     "fields": {}
@@ -12845,6 +12875,10 @@
   },
   {
     "type": "reset",
+    "named": true
+  },
+  {
+    "type": "resource_template",
     "named": true
   },
   {

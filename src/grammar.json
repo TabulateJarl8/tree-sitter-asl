@@ -1899,6 +1899,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "resource_template_term"
+        },
+        {
+          "type": "SYMBOL",
           "name": "to_buffer_term"
         },
         {
@@ -6711,6 +6715,52 @@
         {
           "type": "STRING",
           "value": ")"
+        }
+      ]
+    },
+    "resource_template_term": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "resource_template"
+            },
+            {
+              "type": "STRING",
+              "value": "("
+            },
+            {
+              "type": "STRING",
+              "value": ")"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "FIELD",
+          "name": "resource_macro_list",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "resource_macro_list"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
         }
       ]
     },
