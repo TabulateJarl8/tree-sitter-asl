@@ -11,38 +11,38 @@
 
 ; methods
 
-(method_term method_name: (name_string) @function)
-(function_term function_name: (name_string) @function)
+(method_term method_name: (name_string (name_path (name_seg) @function)))
+(function_term function_name: (name_string (name_path (name_seg) @function)))
 
 ; types
-(device_term device_name: (name_string) @type)
-(scope_term location: (name_string) @type)
-(processor_term processor_name: (name_string) @type)
-(thermal_zone_term thermal_zone_name: (name_string) @type)
-(power_res_term resource_name: (name_string) @type)
+(device_term device_name: (name_string (name_path (name_seg) @type)))
+(scope_term location: (name_string (name_path (name_seg) @type)))
+(processor_term processor_name: (name_string (name_path (name_seg) @type)))
+(thermal_zone_term thermal_zone_name: (name_string (name_path (name_seg) @type)))
+(power_res_term resource_name: (name_string (name_path (name_seg) @type)))
 
 ; constants
-(op_region_term region_name: (name_string) @constant)
-(mutex_term mutex_name: (name_string) @constant)
-(event_term event_name: (name_string) @constant)
-(name_term object_name: (name_string) @constant)
-(alias_term alias_object: (name_string) @constant)
+(op_region_term region_name: (name_string (name_path (name_seg) @constant)))
+(mutex_term mutex_name: (name_string (name_path (name_seg) @constant)))
+(event_term event_name: (name_string (name_path (name_seg) @constant)))
+(name_term object_name: (name_string (name_path (name_seg) @constant)))
+(alias_term alias_object: (name_string (name_path (name_seg) @constant)))
 
 ; field terms
 (field_unit_entry (name_seg) @property)
-(create_bit_field_term bit_field_name: (name_string) @property)
-(create_byte_field_term byte_field_name: (name_string) @property)
-(create_word_field_term word_field_name: (name_string) @property)
-(create_dword_field_term dword_field_name: (name_string) @property)
-(create_qword_field_term qword_field_name: (name_string) @property)
-(create_field_term field_name: (name_string) @property)
+(create_bit_field_term bit_field_name: (name_string (name_path (name_seg) @property)))
+(create_byte_field_term byte_field_name: (name_string (name_path (name_seg) @property)))
+(create_word_field_term word_field_name: (name_string (name_path (name_seg) @property)))
+(create_dword_field_term dword_field_name: (name_string (name_path (name_seg) @property)))
+(create_qword_field_term qword_field_name: (name_string (name_path (name_seg) @property)))
+(create_field_term field_name: (name_string (name_path (name_seg) @property)))
 (pld_keyword) @property
 
 ; resource descriptor names
-(_ descriptor_name: (name_string) @label)
+(_ descriptor_name: (name_string (name_path (name_seg) @label)))
 
 ; method call
-(method_invocation_term (name_string) @function)
+(method_invocation_term (name_string (name_path (name_seg) @function)))
 
 ; keywords
 [
@@ -268,6 +268,7 @@
 ] @operator
 [ "(" ")" "{" "}" "[" "]" ] @punctuation.bracket
 [ "," "." ";" ] @punctuation.delimiter
+[ "\\" "^" ] @punctuation.special
 
 
 ; https://neovim.io/doc/user/treesitter/
