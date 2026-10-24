@@ -1540,6 +1540,14 @@
             "named": true
           },
           {
+            "type": "deref_of_term",
+            "named": true
+          },
+          {
+            "type": "index_symbolic_term",
+            "named": true
+          },
+          {
             "type": "index_term",
             "named": true
           },
@@ -2495,6 +2503,50 @@
       "types": [
         {
           "type": "eisa_id",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "else_if_term",
+    "named": true,
+    "fields": {
+      "predicate": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "term_arg",
+            "named": true
+          }
+        ]
+      },
+      "term_list": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_list",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "else_if",
+          "named": true
+        },
+        {
+          "type": "else_if_term",
+          "named": true
+        },
+        {
+          "type": "else_term",
           "named": true
         }
       ]
@@ -4568,6 +4620,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "else_if_term",
+          "named": true
+        },
         {
           "type": "else_term",
           "named": true
@@ -12559,6 +12615,10 @@
   },
   {
     "type": "else",
+    "named": true
+  },
+  {
+    "type": "else_if",
     "named": true
   },
   {

@@ -680,10 +680,15 @@ const grammarMap = defineGrammar({
       ),
 
     case_term: ($) =>
-      makeTerm($.case, {
-        value: $.data_object,
-        term_list: optional($.term_list),
-      }),
+      makeTerm(
+        $.case,
+        {
+          value: $.data_object,
+        },
+        {
+          term_list: optional($.term_list),
+        },
+      ),
 
     concat_res_term: ($) =>
       makeTerm($.concatenate_res_template, {
