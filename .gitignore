@@ -1,3 +1,5 @@
+*.dsl
+
 # Rust artifacts
 target/
 

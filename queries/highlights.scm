@@ -1,4 +1,5 @@
 ; https://zed.dev/docs/extensions/languages#syntax-highlighting
+; https://neovim.io/doc/user/treesitter/
 
 (comment) @comment
 (string) @string
@@ -269,6 +270,3 @@
 [ "(" ")" "{" "}" "[" "]" ] @punctuation.bracket
 [ "," "." ";" ] @punctuation.delimiter
 [ "\\" "^" ] @punctuation.special
-
-
-; https://neovim.io/doc/user/treesitter/
