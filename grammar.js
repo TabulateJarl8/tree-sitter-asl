@@ -33,30 +33,76 @@ function isOptional(rule) {
 }
 
 /**
+ * @type {Record<string, () => SeqRule>}
+ */
+const termHelperRules = {};
+
+/**
  *
- * @param {Rule} keyword
+ * @param {Rule & {name: string}} keyword named rule
  * @param {Record<string, Rule>} args
  * @param {Record<string, Rule>?} block
- * @returns
+ * @returns {Rule}
  */
 function makeTerm(keyword, args = {}, block = null) {
-  const commas = [];
+  const parts = [];
   const entries = Object.entries(args);
 
   // any optional rules need to be split into their own subrule so that we don't get state explosion
   // its sort of vaguely talked about here https://github.com/tree-sitter/tree-sitter/wiki/Tips-and-Tricks-for-a-grammar-author
-  for (let i = 0; i < entries.length; i++) {
+
+  // in ASL, optional args in the middle require commas and are omitted, and trailing optionals can be omitted
+
+  // find where trailing optionals start (they'll be chained together at the end to allow for up to x number of omissions)
+  let trailingOptionalStartIndex = entries.length;
+  while (
+    trailingOptionalStartIndex > 1 &&
+    isOptional(entries[trailingOptionalStartIndex - 1][1])
+  )
+    trailingOptionalStartIndex--;
+
+  // transform everything up to trailing optionals into grammar
+  for (let i = 0; i < trailingOptionalStartIndex; i++) {
     const [key, rule] = entries[i];
     const fielded = field(key, rule);
 
     if (i === 0) {
-      commas.push(fielded);
+      parts.push(fielded);
+    } else if (isOptional(rule)) {
+      // optionals are pushed into their own hidden rule
+      const ruleName = `__${keyword.name}_${key}`;
+      termHelperRules[ruleName] = () => seq(",", fielded);
+      parts.push(sym(ruleName));
     } else {
-      commas.push(",", fielded);
+      parts.push(",", fielded);
     }
   }
 
-  const parens = seq(keyword, "(", ...commas, ")");
+  // optional trailing args are allowed to be left out, chain them together like a linked list
+  if (trailingOptionalStartIndex < entries.length) {
+    for (let i = entries.length - 1; i >= trailingOptionalStartIndex; i--) {
+      const [key, rule] = entries[i];
+      const ruleName = `__${keyword.name}_${key}`;
+      const nextRule = (() => {
+        if (i + 1 < entries.length) {
+          return [optional(sym(`__${keyword.name}_${entries[i + 1][0]}`))];
+        } else {
+          return [];
+        }
+      })();
+
+      termHelperRules[ruleName] = () => seq(",", field(key, rule), ...nextRule);
+    }
+
+    // push start of rule chain to the end of parts
+    parts.push(
+      optional(
+        sym(`__${keyword.name}_${entries[trailingOptionalStartIndex][0]}`),
+      ),
+    );
+  }
+
+  const parens = seq(keyword, "(", ...parts, ")");
   if (!block) return parens;
 
   const blockFields = Object.entries(block).map(([key, rule]) =>
@@ -65,7 +111,15 @@ function makeTerm(keyword, args = {}, block = null) {
   return seq(parens, "{", ...blockFields, "}");
 }
 
-export default grammar({
+/**
+ * Wrapper function to provide treesitter autocomplete for the grammar record.
+ * @template {string} T
+ * @param {Grammar<T>} g
+ * @returns {Grammar<T>}
+ */
+const defineGrammar = (g) => g;
+
+const grammarMap = defineGrammar({
   name: "asl",
 
   extras: ($) => [/\s/, $.comment],
@@ -2376,3 +2430,15 @@ export default grammar({
     name_seg: (_) => /[A-Za-z_][0-9A-Za-z_]{0,3}/,
   },
 });
+
+// inject makeTerm helper methods into grammar
+// we need to call each grammar before passing to treesitter method since they're dynamically generated
+// there might be a much better way to do this but i give up for now
+const proxy = new Proxy(Object, {
+  get: (_target, prop, _receiver) => sym(String(prop)),
+});
+// @ts-ignore
+for (const fn of Object.values(grammarMap.rules)) fn(proxy);
+Object.assign(grammarMap.rules, termHelperRules);
+
+export default grammar(grammarMap);
