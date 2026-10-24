@@ -2140,6 +2140,7 @@ const grammarMap = defineGrammar({
         register_bit_width: $._byte_const_expr,
         register_offset: $._byte_const_expr,
         register_address: $._qword_const_expr,
+        // TODO: in my decompiled laptop ASL, this is missing on some calls. should it be optional?
         access_size: $._byte_const_expr,
         descriptor_name: optional($.name_string),
       }),
