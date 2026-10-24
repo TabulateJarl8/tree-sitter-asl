@@ -11,10 +11,12 @@
 
 /**
  * Comma separated list of 1 or more entries
+ * Allows for trailing comma
  * @param {Rule} rule
  */
 function commaSep1(rule) {
-  return seq(rule, repeat(seq(",", rule)));
+  // WARN: allow for trailing comma (not sure if that will break things)
+  return seq(rule, repeat(seq(",", rule)), optional(","));
 }
 
 /**
@@ -703,18 +705,15 @@ const grammarMap = defineGrammar({
       }),
 
     cond_ref_of_term: ($) =>
-      makeTerm(
-        $.cond_ref_of,
-        {
-          source: choice(
-            $.name_string,
-            $.arg_term,
-            $.local_term,
-            $.deref_of_term,
-          ),
-        },
-        { destination: optional($.target) },
-      ),
+      makeTerm($.cond_ref_of, {
+        source: choice(
+          $.name_string,
+          $.arg_term,
+          $.local_term,
+          $.deref_of_term,
+        ),
+        destination: optional($.target),
+      }),
 
     continue_term: ($) => $.continue,
 
