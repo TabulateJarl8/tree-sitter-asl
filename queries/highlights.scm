@@ -7,7 +7,7 @@
 (name_seg) @variable
 
 (arg_term) @variable.parameter
-[ (local_term) (debug) ] @variable.special
+[ (local_term) (debug) ] @variable.special @variable.builtin
 
 ; methods
 
@@ -29,14 +29,14 @@
 (alias_term alias_object: (name_string (name_path (name_seg) @constant)))
 
 ; field terms
-(field_unit_entry (name_seg) @property)
-(create_bit_field_term bit_field_name: (name_string (name_path (name_seg) @property)))
-(create_byte_field_term byte_field_name: (name_string (name_path (name_seg) @property)))
-(create_word_field_term word_field_name: (name_string (name_path (name_seg) @property)))
-(create_dword_field_term dword_field_name: (name_string (name_path (name_seg) @property)))
-(create_qword_field_term qword_field_name: (name_string (name_path (name_seg) @property)))
-(create_field_term field_name: (name_string (name_path (name_seg) @property)))
-(pld_keyword) @property
+(field_unit_entry (name_seg) @property @variable.member)
+(create_bit_field_term bit_field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(create_byte_field_term byte_field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(create_word_field_term word_field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(create_dword_field_term dword_field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(create_qword_field_term qword_field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(create_field_term field_name: (name_string (name_path (name_seg) @property @variable.member)))
+(pld_keyword) @property @variable.member
 
 ; resource descriptor names
 (_ descriptor_name: (name_string (name_path (name_seg) @label)))
@@ -106,7 +106,7 @@
 [
   (include)
   (external)
-] @preproc
+] @preproc @keyword.directive
 
 ; operator functions
 [
@@ -162,7 +162,7 @@
   (to_string)
   (to_uuid)
   (unicode)
-] @function
+] @function.builtin
 
 ; data constructors
 [
