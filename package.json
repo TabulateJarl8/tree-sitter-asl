@@ -1,7 +1,7 @@
 {
   "name": "tree-sitter-asl",
   "version": "0.1.0",
-  "description": "ACPI Source Language",
+  "description": "tree-sitter grammar for ACPI Source Language",
   "type": "module",
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 [project]
 name = "tree-sitter-asl"
 version = "0.1.0"
-description = "ACPI Source Language"
+description = "tree-sitter grammar for ACPI Source Language"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
