@@ -273,7 +273,7 @@ const grammarMap = defineGrammar({
     // NOTE: this differs from the spec slightly to avoid empty string matches
     // NOTE: this must be marked optional() in the parent
     case_term_list: ($) => repeat1(choice($.case_term, $.default_term)),
-    if_else_term: ($) => seq($.if_term, $.else_term),
+    if_else_term: ($) => seq($.if_term, optional($._else_else_if)),
 
     // 19.2.4 ASL Data and Constant Terms
     // Numeric Value Terms
